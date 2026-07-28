@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>MEGA BLASTER X — 50 Stage Platformer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+            font-family: 'Press Start 2P',monospace;
+        }
+
+        #wrap {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg,#0a0a14,#1a0a2a);
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            background: #000;
+            box-shadow: 0 0 40px rgba(80,40,160,.4);
+        }
+
+        #touchUI {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+
+        @media (pointer: coarse) {
+            #touchUI {
+                display: block;
+            }
+        }
+
+        .touchBtn {
+            position: absolute;
+            pointer-events: auto;
+            background: rgba(30,30,50,.6);
+            border: 2px solid rgba(100,150,255,.6);
+            color: #fff;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Press Start 2P';
+            font-size: 10px;
+            user-select: none;
+            touch-action: none;
+            width: 55px;
+            height: 55px;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        #tLeft {
+            left: 20px;
+            bottom: 80px;
+        }
+
+        #tRight {
+            left: 85px;
+            bottom: 80px;
+        }
+
+        #tDown {
+            left: 52px;
+            bottom: 25px;
+        }
+
+        #tJump {
+            right: 20px;
+            bottom: 80px;
+        }
+
+        #tShoot {
+            right: 85px;
+            bottom: 80px;
+        }
+
+        #tSword {
+            right: 150px;
+            bottom: 80px;
+        }
+
+        #tSlide {
+            right: 117px;
+            bottom: 25px;
+        }
+
+        #tGuard {
+            right: 20px;
+            bottom: 145px;
+        }
+
+        #tGrapple {
+            right: 85px;
+            bottom: 145px;
+        }
+
+        #tStim {
+            right: 150px;
+            bottom: 145px;
+        }
+
+        #tGrenade {
+            right: 215px;
+            bottom: 145px;
+        }
+
+        #tInvinc {
+            right: 215px;
+            bottom: 80px;
+        }
+    </style>
+</head>
+<body>
+    <div id="wrap">
+        <canvas id="c" width="960" height="540"></canvas>
+        <div id="touchUI">
+            <button class="touchBtn" id="tLeft">◀</button>
+            <button class="touchBtn" id="tRight">▶</button>
+            <button class="touchBtn" id="tDown">▼</button>
+            <button class="touchBtn" id="tJump">JMP</button>
+            <button class="touchBtn" id="tShoot">SHT</button>
+            <button class="touchBtn" id="tSword">SWD</button>
+            <button class="touchBtn" id="tSlide">SLD</button>
+            <button class="touchBtn" id="tGuard">GRD</button>
+            <button class="touchBtn" id="tGrapple">GRP</button>
+            <button class="touchBtn" id="tStim">STM</button>
+            <button class="touchBtn" id="tGrenade">GRN</button>
+            <button class="touchBtn" id="tInvinc">INV</button>
+        </div>
+    </div>
+    <script>
+        "use strict";
+        // ═══════════════════════════════════════════════
+        // MEGA BLASTER X — 50 Stage Platformer v6
+        // ═══════════════════════════════════════════════
+        const cv = document.getElementById('c');
+        const ctx = cv.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        const W = 960, H = 540, TILE = 32;
+
+        function bindTouch(id, key) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const press = (e) => { e.preventDefault(); Input.keys[key] = true; Input.kp[key] = true; AC.init(); };
+            const release = (e) => { e.preventDefault(); Input.keys[key] = false; };
+            el.addEventListener('touchstart', press, { passive: false });
+            el.addEventListener('touchend', release, { passive: false });
+            el.addEventListener('touchcancel', release, { passive: false });
+            el.addEventListener('mousedown', press);
+            el.addEventListener('mouseup', release);
+            el.addEventListener('mouseleave', release);
+        }
+
+        // ── Themes ──
+        const THEMES = [
+            { n: 'INDUSTRIAL ZONE', bg: '#1a1428', bg2: '#0d0a18', tl: '#5a4a6a', tl2: '#3a3045', ac: '#ff6b3d', gl: '#ff8c5a', dg: '#ff3344', fg: '#2a1f3a' },
+            { n: 'ICE LABORATORY', bg: '#0a1a2e', bg2: '#050d1a', tl: '#3a6a9a', tl2: '#2a4a6a', ac: '#6bcfff', gl: '#9ee0ff', dg: '#ff5577', fg: '#1a2a3e' },
+            { n: 'FIRE REACTOR', bg: '#2a0a0a', bg2: '#1a0505', tl: '#8a3a2a', tl2: '#5a2010', ac: '#ffaa33', gl: '#ffcc66', dg: '#ff2200', fg: '#3a1515' },
+            { n: 'JUNGLE RUINS', bg: '#0a1f0a', bg2: '#051005', tl: '#3a6a3a', tl2: '#2a4a2a', ac: '#66dd44', gl: '#99ee77', dg: '#ff4466', fg: '#1a2a1a' },
+            { n: 'SKY FORTRESS', bg: '#1a2a4e', bg2: '#0a152a', tl: '#5a7aaa', tl2: '#3a5a7a', ac: '#88ddff', gl: '#aaeeff', dg: '#ff6644', fg: '#2a3a5a' },
+            { n: 'DEEP SECTOR', bg: '#0a1a1a', bg2: '#050d0d', tl: '#2a5a5a', tl2: '#1a3a3a', ac: '#33ddaa', gl: '#55eebb', dg: '#ff4466', fg: '#152a2a' },
+            { n: 'DESERT CORE', bg: '#2a1a05', bg2: '#1a1005', tl: '#8a6a3a', tl2: '#5a4520', ac: '#ffbb44', gl: '#ffcc77', dg: '#ff4422', fg: '#3a2515' },
+            { n: 'CYBER GRID', bg: '#1a0a2a', bg2: '#0d0518', tl: '#6a3a8a', tl2: '#4a2a5a', ac: '#ff44dd', gl: '#aa77ff', dg: '#ff3366', fg: '#2a1a3a' }
+        ];
+        const BOSS_NAMES = ['', 'COGMASTER', 'FROSTBITE', 'INFERNO', 'VINECREEP', 'STORMWING', 'DEPTHKING', 'SANDSCORCH', 'GRIDLORD', 'OMEGA UNIT', 'MEGA EMPEROR'];
+
+        // ── Save System ──
+        const Save = {
+            k: 'megaBlasterX_v6',
+            load() { try { const d = localStorage.getItem(this.k); return d ? JSON.parse(d) : { hu: 1, cmp: [], sc: 0 }; } catch (e) { return { hu: 1, cmp: [], sc: 0 }; } },
+            save(d) { try { localStorage.setItem(this.k, JSON.stringify(d)); } catch (e) { } }
+        };
+
+        // ── Seeded RNG ──
+        function rng(seed) { let s = seed | 0; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
+
+        // ── Audio ──
+        const AC = {
+            ctx: null, init() { if (!this.ctx) try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { } },
+            play(freq, dur, type = 'square', vol = .08) { if (!this.ctx) return; const o = this.ctx.createOscillator(), g = this.ctx.createGain(); o.type = type; o.frequency.value = freq; g.gain.setValueAtTime(vol, this.ctx.currentTime); g.gain.exponentialRampToValueAtTime(.001, this.ctx.currentTime + dur); o.connect(g); g.connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + dur); },
+            noise(dur, vol = .06) { if (!this.ctx) return; const b = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++)d[i] = (Math.random() * 2 - 1) * Math.exp(-i / d.length * 4); const s = this.ctx.createBufferSource(); s.buffer = b; const g = this.ctx.createGain(); g.gain.value = vol; s.connect(g); g.connect(this.ctx.destination); s.start(); }
+        };
+        const SFX = {
+            shoot() { AC.play(880, .06, 'square', .04); },
+            sword() { AC.noise(.1, .05); AC.play(200, .08, 'sawtooth', .03); },
+            jump() { AC.play(440, .08, 'square', .05); setTimeout(() => AC.play(660, .06, 'square', .04), 40); },
+            wallJump() { AC.play(550, .06, 'square', .05); setTimeout(() => AC.play(880, .08, 'square', .04), 30); },
+            stompBounce() { AC.play(300, .1, 'square', .06); setTimeout(() => AC.play(800, .15, 'square', .06), 30); },
+            stompGround() { AC.play(80, .3, 'sawtooth', .12); AC.noise(.4, .1); },
+            hit() { AC.noise(.15, .08); },
+            enemyHit() { AC.play(300, .05, 'square', .04); },
+            enemyDie() { AC.play(150, .2, 'sawtooth', .06); setTimeout(() => AC.noise(.2, .06), 50); },
+            damage() { AC.play(100, .3, 'sawtooth', .08); },
+            guard() { AC.play(400, .05, 'square', .04); AC.noise(.05, .04); },
+            guardBreak() { AC.play(80, .4, 'sawtooth', .1); AC.noise(.3, .08); },
+            stim() { AC.play(523, .1, 'sine', .05); setTimeout(() => AC.play(659, .1, 'sine', .05), 80); setTimeout(() => AC.play(784, .15, 'sine', .05), 160); },
+            grapple() { AC.play(200, .15, 'sawtooth', .04); },
+            complete() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => AC.play(f, .15, 'square', .06), i * 100)); },
+            boss() { AC.play(80, .5, 'sawtooth', .1); setTimeout(() => AC.play(60, .5, 'sawtooth', .08), 200); },
+            select() { AC.play(660, .05, 'square', .03); },
+            boost() { AC.play(120, .15, 'sawtooth', .05); AC.noise(.1, .04); },
+            explosion() { AC.play(60, .3, 'sawtooth', .12); AC.noise(.4, .1); },
+            invinc() { AC.play(523, .2, 'square', .08); setTimeout(() => AC.play(784, .2, 'square', .08), 100); setTimeout(() => AC.play(1047, .4, 'square', .1), 200); }
+        };
+
+        // ── Input ──
+        const Input = {
+            keys: {}, kp: {},
+            gp: null, gpb: {}, gpbp: {}, prevGpb: {}, axes: { lx: 0, ly: 0, rx: 0, ry: 0 },
+            mx: 0, my: 0,
+            lastTap: { left: 0, right: 0 }, _pl: false, _pr: false,
+            init() {
+                window.addEventListener('keydown', e => { if (!this.keys[e.code]) this.kp[e.code] = true; this.keys[e.code] = true; if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); });
+                window.addEventListener('keyup', e => { this.keys[e.code] = false; });
+                cv.addEventListener('mousemove', e => { const r = cv.getBoundingClientRect(); this.mx = (e.clientX - r.left) * (W / r.width); this.my = (e.clientY - r.top) * (H / r.height); });
+                cv.addEventListener('mousedown', () => { AC.init(); });
+                bindTouch('tLeft', 'ArrowLeft'); bindTouch('tRight', 'ArrowRight'); bindTouch('tDown', 'ArrowDown');
+                bindTouch('tJump', 'Space'); bindTouch('tShoot', 'KeyX'); bindTouch('tSword', 'KeyZ');
+                bindTouch('tSlide', 'KeyS'); bindTouch('tGuard', 'ShiftLeft'); bindTouch('tGrapple', 'KeyE'); bindTouch('tStim', 'KeyQ');
+                bindTouch('tGrenade', 'KeyG'); bindTouch('tInvinc', 'KeyV');
+            },
+            update() {
+                const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+                this.gp = pads[0] || null;
+                this.prevGpb = { ...this.gpb };
+                if (this.gp) {
+                    for (let i = 0; i < this.gp.buttons.length; i++) this.gpb[i] = this.gp.buttons[i].pressed;
+                    this.axes.lx = this.gp.axes[0] || 0; this.axes.ly = this.gp.axes[1] || 0;
+                    this.axes.rx = this.gp.axes[2] || 0; this.axes.ry = this.gp.axes[3] || 0;
+                    if (Math.abs(this.axes.lx) < .1 && Math.abs(this.axes.ly) < .1) {
+                        if (this.gp.buttons[14]?.pressed) this.axes.lx = -1;
+                        if (this.gp.buttons[15]?.pressed) this.axes.lx = 1;
+                        if (this.gp.buttons[12]?.pressed) this.axes.ly = -1;
+                        if (this.gp.buttons[13]?.pressed) this.axes.ly = 1;
+                    }
+                }
+                this.gpbp = {};
+                if (this.gp) for (let i = 0; i < this.gp.buttons.length; i++) if (this.gpb[i] && !this.prevGpb[i]) this.gpbp[i] = true;
+                if (this.gp) {
+                    const lt = this.gp.buttons[6]?.value || 0, rt = this.gp.buttons[7]?.value || 0;
+                    if (lt > .3) this.gpb[6] = true; if (lt <= .3) this.gpb[6] = false;
+                    if (rt > .3) this.gpb[7] = true; if (rt <= .3) this.gpb[7] = false;
+                }
+            },
+            postUpdate() { this.kp = {}; },
+            left() { return this.keys.ArrowLeft || this.keys.KeyA || (this.axes.lx < -.3); },
+            right() { return this.keys.ArrowRight || this.keys.KeyD || (this.axes.lx > .3); },
+            up() { return this.keys.ArrowUp || this.keys.KeyW || (this.axes.ly < -.3); },
+            down() { return this.keys.ArrowDown || this.keys.KeyS || (this.axes.ly > .3); },
+            jumpPressed() { return this.kp.Space || this.gpbp[0]; },
+            shootHeld() { return this.keys.KeyX || this.gpb[7]; },
+            shootPressed() { return this.kp.KeyX || this.gpbp[7]; },
+            swordPressed() { return this.kp.KeyZ || this.gpbp[2]; },
+            slidePressed() { return this.kp.KeyS || this.gpbp[1]; },
+            stimPressed() { return this.kp.KeyQ || this.gpbp[3]; },
+            grapplePressed() { return this.kp.KeyE || this.gpbp[4]; },
+            grenadePressed() { return this.kp.KeyG || this.gpbp[6]; },
+            guardHeld() { return this.keys.ShiftLeft || this.gpb[5]; },
+            invincibilityPressed() { return this.kp.KeyV || this.gpbp[10]; },
+            pausePressed() { return this.kp.Escape || this.gpbp[9]; },
+            startPressed() { return this.kp.Enter || this.gpbp[9] || this.kp.Space || this.gpbp[0] || this.kp.KeyZ; },
+            confirmPressed() { return this.kp.Enter || this.kp.Space || this.gpbp[0] || this.kp.KeyZ; },
+            anyPressed() { return Object.keys(this.kp).length > 0 || Object.keys(this.gpbp).length > 0; },
+            checkDoubleTap() {
+                const now = performance.now();
+                let boost = 0;
+                if (this.left() && !this._pl) { const t = now - this.lastTap.left; if (t < 250 && t > 0) boost = -1; this.lastTap.left = now; this._pl = true; }
+                if (!this.left()) this._pl = false;
+                if (this.right() && !this._pr) { const t = now - this.lastTap.right; if (t < 250 && t > 0) boost = 1; this.lastTap.right = now; this._pr = true; }
+                if (!this.right()) this._pr = false;
+                return boost;
+            }
+        };
+
+        // ── Level Generator ──
+        function genLevel(num) {
+            const r = rng(num * 7919 + 42);
+            const ti = (num - 1) % 8;
+            const th = THEMES[ti];
+            const diff = Math.ceil(num / 5);
+            const isBoss = num % 5 === 0;
+            if (isBoss) return genBoss(num, th, diff, r);
+
+            const lw = 60 + num * 2 + Math.floor(r() * 20);
+            const lh = 17;
+            const g = Array.from({ length: lh }, () => new Array(lw).fill(0));
+
+            let x = 0;
+            while (x < lw) {
+                const seg = 4 + Math.floor(r() * 8);
+                for (let i = 0; i < seg && x < lw; i++) { g[lh - 1][x] = 1; g[lh - 2][x] = 0; x++; }
+                if (r() < .25 + diff * .04 && x < lw - 6) {
+                    const gap = 2 + Math.floor(r() * Math.min(3 + diff, 6));
+                    if (r() < .4 && gap <= 3) { for (let i = 0; i < gap && x < lw; i++) { g[lh - 1][x] = 1; g[lh - 2][x] = 3; x++; } }
+                    else x += gap;
+                }
+            }
+            for (let i = 0; i < 4; i++) { g[lh - 1][i] = 1; g[lh - 2][i] = 0; }
+
+            const npl = 8 + diff * 2 + Math.floor(r() * 6);
+            for (let i = 0; i < npl; i++) {
+                const px = 4 + Math.floor(r() * (lw - 8));
+                const py = 4 + Math.floor(r() * (lh - 7));
+                const pl = 2 + Math.floor(r() * 4);
+                for (let j = 0; j < pl && px + j < lw; j++) if (g[py][px + j] === 0) g[py][px + j] = 2;
+            }
+
+            const wjc = num >= 4 ? Math.min(2, Math.floor((num - 4) / 10) + 1) : 0;
+            for (let i = 0; i < wjc; i++) {
+                const sx = 15 + Math.floor(r() * (lw - 30));
+                const gap = 4;
+                const leftWall = sx;
+                const rightWall = sx + gap + 1;
+
+                for (let y = lh - 3; y >= lh - 8; y--) {
+                    for (let dx = 0; dx <= gap + 1; dx++) {
+                        const tx = sx + dx;
+                        if (tx < lw && g[y]) g[y][tx] = 0;
+                    }
+                }
+                for (let y = lh - 3; y >= lh - 8; y--) {
+                    if (g[y]) {
+                        g[y][leftWall] = 1;
+                        if (rightWall < lw) g[y][rightWall] = 1;
+                    }
+                }
+                for (let dx = -1; dx <= gap + 2; dx++) {
+                    const tx = sx + dx;
+                    if (tx >= 0 && tx < lw && g[lh - 9]) g[lh - 9][tx] = 1;
+                }
+                if (g[lh - 2]) {
+                    for (let dx = 1; dx <= gap; dx++) {
+                        const tx = sx + dx;
+                        if (tx < lw) g[lh - 2][tx] = 3;
+                    }
+                }
+                if (g[lh - 1]) {
+                    for (let dx = 0; dx <= gap + 1; dx++) {
+                        const tx = sx + dx;
+                        if (tx < lw) g[lh - 1][tx] = 1;
+                    }
+                }
+                if (g[lh - 9] && rightWall + 1 < lw) {
+                    g[lh - 9][rightWall + 1] = 0;
+                    g[lh - 9][rightWall + 2] = 0;
+                }
+                if (g[lh - 10] && rightWall + 1 < lw) {
+                    g[lh - 10][rightWall + 1] = 1;
+                    if (rightWall + 2 < lw) g[lh - 10][rightWall + 2] = 1;
+                }
+            }
+
+            for (let i = 0; i < diff + 2; i++) {
+                const ax = 5 + Math.floor(r() * (lw - 10));
+                g[0][ax] = 1; g[1][ax] = 1;
+                if (ax + 1 < lw) g[0][ax + 1] = 1;
+            }
+
+            for (let i = 0; i < diff * 2; i++) {
+                const sx = 5 + Math.floor(r() * (lw - 10));
+                if (g[lh - 1][sx] === 1 && g[lh - 2][sx] === 0) g[lh - 2][sx] = 3;
+            }
+
+            let gx = lw - 2; while (g[lh - 1][gx] !== 1 && gx > 0) gx--; g[lh - 1][gx] = 1; g[lh - 2][gx] = 4;
+
+            const enemies = [];
+            const ne = 3 + diff * 2 + Math.floor(r() * 3);
+            for (let i = 0; i < ne; i++) {
+                const ex = 6 + Math.floor(r() * (lw - 12));
+                let ey = lh - 3;
+                for (let y = lh - 1; y >= 0; y--) { if (g[y][ex] === 1) { ey = y - 2; break; } }
+                let types = ['gunner', 'swordsman', 'swordsman'];
+                if (num >= 3) types.push('sniper', 'swordsman');
+                if (num >= 6) types.push('chaser', 'swordsman');
+                if (num >= 10) types.push('turret', 'swordsman');
+                if (num >= 15) types.push('swordsman', 'swordsman', 'gunner');
+                if (num >= 25) types.push('swordsman', 'sniper', 'chaser');
+                if (num >= 35) types.push('swordsman', 'turret', 'swordsman');
+                const type = types[Math.floor(r() * types.length)];
+                if (g[ey] && g[ey][ex] === 0) enemies.push({ x: ex * TILE, y: ey * TILE, type });
+            }
+
+            const checkpoints = [];
+            for (let cx = 15; cx < lw - 5; cx += 20) { checkpoints.push(cx * TILE + TILE / 2); }
+
+            return { grid: g, enemies, theme: th, width: lw, height: lh, isBoss: false, num, checkpoints, startX: TILE * 2, startY: (lh - 4) * TILE, hasWallJump: wjc > 0 };
+        }
+
+        function genBoss(num, th, diff, r) {
+            const lw = 28, lh = 17;
+            const g = Array.from({ length: lh }, () => new Array(lw).fill(0));
+            for (let x = 0; x < lw; x++) g[lh - 1][x] = 1;
+            for (let y = 0; y < lh; y++) { g[y][0] = 1; g[y][lw - 1] = 1; }
+            for (let i = 0; i < 5; i++) {
+                const px = 4 + Math.floor(r() * 18), py = 4 + Math.floor(r() * 8);
+                g[py][px] = 2; if (px + 1 < lw) g[py][px + 1] = 2; if (px + 2 < lw) g[py][px + 2] = 2;
+            }
+            for (let y = lh - 2; y >= lh - 6; y--) { g[y][3] = 1; g[y][lw - 4] = 1; }
+            const boss = { x: (lw - 4) * TILE, y: (lh - 5) * TILE, num };
+            return { grid: g, enemies: [], boss, theme: th, width: lw, height: lh, isBoss: true, num, checkpoints: [], startX: TILE * 2, startY: (lh - 4) * TILE, hasWallJump: true };
+        }
+
+        // ── Collision ──
+        function tileAt(level, tx, ty) {
+            if (ty < 0 || ty >= level.height || tx < 0 || tx >= level.width) return 1;
+            return level.grid[ty][tx];
+        }
+        function isSolid(t) { return t === 1; }
+        function isOneWay(t) { return t === 2; }
+        function isSpike(t) { return t === 3; }
+        function isGoal(t) { return t === 4; }
+
+        function moveX(e, level) {
+            e.x += e.vx;
+            const top = Math.floor(e.y / TILE);
+            const bot = Math.floor((e.y + e.h - 1) / TILE);
+            e.hitWallR = false; e.hitWallL = false;
+            if (e.vx > 0) {
+                const rx = Math.floor((e.x + e.w - 1) / TILE);
+                for (let ty = top; ty <= bot; ty++) {
+                    if (isSolid(tileAt(level, rx, ty))) { e.x = rx * TILE - e.w; e.vx = 0; e.hitWallR = true; break; }
+                }
+            } else if (e.vx < 0) {
+                const lx = Math.floor(e.x / TILE);
+                for (let ty = top; ty <= bot; ty++) {
+                    if (isSolid(tileAt(level, lx, ty))) { e.x = (lx + 1) * TILE; e.vx = 0; e.hitWallL = true; break; }
+                }
+            }
+        }
+        function moveY(e, level) {
+            e.y += e.vy;
+            const lx = Math.floor(e.x / TILE);
+            const rx = Math.floor((e.x + e.w - 1) / TILE);
+            e.grounded = false;
+            if (e.vy > 0) {
+                const by = Math.floor((e.y + e.h - 1) / TILE);
+                for (let tx = lx; tx <= rx; tx++) {
+                    const t = tileAt(level, tx, by);
+                    if (isSolid(t)) { e.y = by * TILE - e.h; e.vy = 0; e.grounded = true; break; }
+                    if (isOneWay(t) && e.vy > 0 && !e.dropThrough) {
+                        const prevBy = Math.floor((e.y + e.h - 1 - e.vy) / TILE);
+                        if (prevBy < by) { e.y = by * TILE - e.h; e.vy = 0; e.grounded = true; break; }
+                    }
+                }
+            } else if (e.vy < 0) {
+                const ty = Math.floor(e.y / TILE);
+                for (let tx = lx; tx <= rx; tx++) {
+                    if (isSolid(tileAt(level, tx, ty))) { e.y = (ty + 1) * TILE; e.vy = 0; break; }
+                }
+            }
+            const cx = Math.floor((e.x + e.w / 2) / TILE), cy = Math.floor((e.y + e.h / 2) / TILE);
+            if (isSpike(tileAt(level, cx, cy)) || isSpike(tileAt(level, Math.floor(e.x / TILE), Math.floor((e.y + e.h - 2) / TILE))) || isSpike(tileAt(level, Math.floor((e.x + e.w - 1) / TILE), Math.floor((e.y + e.h - 2) / TILE)))) {
+                if (e.takeSpikeDamage) e.takeSpikeDamage();
+            }
+        }
+
+        // ── Player ──
+        class Player {
+            constructor(x, y) {
+                this.x = x; this.y = y; this.w = 18; this.h = 28; this.vx = 0; this.vy = 0;
+                this.facing = 1; this.grounded = false; this.hitWallL = false; this.hitWallR = false;
+                this.hp = 100; this.maxHp = 100;
+                this.canDoubleJump = true;
+                this.shootCD = 0; this.swordCD = 0; this.slideCD = 0; this.grappleCD = 0;
+                this.sliding = false; this.slideTimer = 0;
+                this.boosting = false; this.boostDir = 1; this.boostCD = 0;
+                this.wallDir = 0; this.wallSliding = false; this.wallJumpLock = 0;
+                this.touchingWallL = false; this.touchingWallR = false;
+                this.stims = 3; this.stimHeal = 0;
+                this.grenades = 3; this.grenadeCD = 0; this.grenadeRegen = 1200;
+                this.invuln = 0; this.regenTimer = 0; this.regenActive = false;
+                this.hitStun = 0;
+                this.guard = 100; this.maxGuard = 100; this.guarding = false; this.guardBreakStun = 0;
+                this.stomping = false;
+                this.swordActive = 0;
+                this.grappling = false; this.grappleX = 0; this.grappleY = 0;
+                this.dropThrough = false;
+                this.animTime = 0; this.muzzleFlash = 0;
+                this.coyote = 0; this.jumpBuffer = 0;
+                this.combo = 0; this.comboTimer = 0;
+                this.invCharge = 0; this.invModeActive = false; this.invMode = 0;
+            }
+
+            guardColor() {
+                if (this.guard > 66) return '#44ff44';
+                if (this.guard > 33) return '#ffee44';
+                return '#ff4444';
+            }
+
+            addCombo(amt) {
+                this.combo += amt;
+                this.comboTimer = 120;
+                this.invCharge = Math.min(100, this.invCharge + amt * 2);
+            }
+
+            checkWalls(level) {
+                const top = Math.floor((this.y + 2) / TILE);
+                const bot = Math.floor((this.y + this.h - 2) / TILE);
+                const leftTile = Math.floor((this.x - 1) / TILE);
+                const rightTile = Math.floor((this.x + this.w) / TILE);
+                this.touchingWallL = false; this.touchingWallR = false;
+                for (let ty = top; ty <= bot; ty++) {
+                    if (isSolid(tileAt(level, leftTile, ty))) this.touchingWallL = true;
+                    if (isSolid(tileAt(level, rightTile, ty))) this.touchingWallR = true;
+                }
+            }
+
+            update(level) {
+                this.animTime++;
+                this.hitWallL = false; this.hitWallR = false;
+
+                if (this.combo > 0) {
+                    this.comboTimer--;
+                    if (this.comboTimer <= 0) this.combo = 0;
+                }
+
+                if (this.invModeActive) {
+                    this.invMode--;
+                    if (this.invMode <= 0) {
+                        this.invModeActive = false;
+                        this.invCharge = 0;
+                    }
+                    for (const e of game.enemies) {
+                        if (!e.dead && this.x < e.x + e.w && this.x + this.w > e.x && this.y < e.y + e.h && this.y + this.h > e.y) {
+                            e.takeDamage(9999, this.facing, true);
+                            game.hitStop = 2;
+                        }
+                    }
+                    if (game.boss && !game.boss.dead && this.x < game.boss.x + game.boss.w && this.x + this.w > game.boss.x && this.y < game.boss.y + game.boss.h && this.y + this.h > game.boss.y) {
+                        game.boss.takeDamage(9999);
+                        game.hitStop = 2;
+                    }
+                } else {
+                    if (Input.invincibilityPressed() && this.invCharge >= 100) {
+                        this.invModeActive = true;
+                        this.invMode = 300;
+                        SFX.invinc(); game.shake = 15; game.flash = 10;
+                    }
+                }
+
+                if (this.hitStun > 0 || this.guardBreakStun > 0) {
+                    if (this.hitStun > 0) this.hitStun--;
+                    if (this.guardBreakStun > 0) this.guardBreakStun--;
+                    this.vx *= 0.9;
+                    this.vy += 0.55; if (this.vy > 14) this.vy = 14;
+                    if (this.boosting) this.boosting = false;
+                    if (this.stomping) this.stomping = false;
+                    moveX(this, level); moveY(this, level);
+                    if (this.shootCD > 0) this.shootCD--;
+                    if (this.muzzleFlash > 0) this.muzzleFlash--;
+                    if (this.swordCD > 0) this.swordCD--;
+                    if (this.swordActive > 0) this.swordActive--;
+                    if (this.slideCD > 0) this.slideCD--;
+                    if (this.grappleCD > 0) this.grappleCD--;
+                    if (this.invuln > 0) this.invuln--;
+                    if (this.regenTimer > 0) this.regenTimer--;
+                    if (this.invuln <= 0 && this.regenTimer <= 0 && this.hp < this.maxHp) {
+                        this.hp = Math.min(this.maxHp, this.hp + 0.5); this.regenActive = true;
+                    } else { this.regenActive = false; }
+                    if (!this.guarding && this.guard < this.maxGuard) this.guard += 0.2;
+                    return;
+                }
+
+                this.guarding = Input.guardHeld() && this.guard > 0 && !this.sliding && !this.boosting && !this.invModeActive && !this.stomping;
+                if (this.guarding) {
+                    this.vx *= 0.3;
+                    if (this.guard < this.maxGuard) this.guard += 0.1;
+                } else {
+                    if (this.guard < this.maxGuard) this.guard += 0.5;
+                }
+
+                const spd = 4.5;
+                let move = 0;
+                if (!this.sliding && !this.guarding && !this.invModeActive && !this.stomping) {
+                    if (Input.left()) move = -1;
+                    if (Input.right()) move = 1;
+                }
+
+                const dt = Input.checkDoubleTap();
+                if (dt !== 0 && this.boostCD <= 0 && !this.sliding && !this.wallSliding && !this.guarding && !this.invModeActive && !this.stomping) {
+                    this.boosting = true; this.boostDir = dt; this.boostCD = 15; SFX.boost();
+                }
+                if (this.boostCD > 0) this.boostCD--;
+
+                if (this.boosting) {
+                    if (this.boostDir > 0 && !Input.right()) this.boosting = false;
+                    if (this.boostDir < 0 && !Input.left()) this.boosting = false;
+                    if (this.sliding || this.wallSliding || this.guarding || this.invModeActive || this.stomping) this.boosting = false;
+                }
+
+                if (this.boosting) {
+                    move = this.boostDir; this.vx = this.boostDir * 9; this.facing = this.boostDir;
+                    if (this.animTime % 2 === 0) game.particles.push({ x: this.x + this.w / 2, y: this.y + (this.sliding ? 7 : 14), vx: -this.boostDir * 3, vy: (Math.random() - .5) * 2, life: 12, color: '#66bbff', size: 3 });
+
+                    for (const e of game.enemies) {
+                        if (!e.dead && this.x < e.x + e.w && this.x + this.w > e.x && this.y < e.y + e.h && this.y + this.h > e.y) {
+                            e.takeDamage(20, this.boostDir, true);
+                            game.hitStop = 3;
+                            this.boosting = false;
+                            break;
+                        }
+                    }
+                    if (game.boss && !game.boss.dead && this.x < game.boss.x + game.boss.w && this.x + this.w > game.boss.x && this.y < game.boss.y + game.boss.h && this.y + this.h > game.boss.y) {
+                        game.boss.takeDamage(20);
+                        game.hitStop = 3;
+                        this.boosting = false;
+                    }
+                } else if (!this.sliding && !this.guarding && !this.stomping) {
+                    if (move !== 0) { this.vx += move * 0.6; this.facing = move; }
+                    else this.vx *= 0.75;
+                    this.vx = Math.max(-spd, Math.min(spd, this.vx));
+                } else if (this.guarding) {
+                    this.vx *= 0.75;
+                }
+
+                if (Input.slidePressed() && this.grounded && !this.sliding && this.slideCD <= 0 && !this.guarding && !this.invModeActive && !this.stomping) {
+                    this.sliding = true; this.slideTimer = 30; this.slideCD = 45;
+                    this.vx = this.facing * 7; this.h = 14; this.y += 14; this.boosting = false; SFX.shoot();
+                }
+                if (this.sliding) {
+                    this.vx *= 0.93; this.slideTimer--;
+                    if (this.slideTimer <= 0 || !this.grounded) { this.sliding = false; this.h = 28; this.y -= 14; if (this.y < 0) this.y = 0; }
+                }
+                if (this.slideCD > 0) this.slideCD--;
+
+                this.dropThrough = Input.down() && this.grounded && !this.guarding && !Input.shootHeld() && !this.stomping;
+
+                // ── Sonic Stomp Activation ──
+                if (!this.grounded && !this.stomping && Input.down() && !this.guarding && !Input.shootHeld() && !this.invModeActive) {
+                    this.stomping = true;
+                    this.sliding = false; this.h = 28;
+                    this.boosting = false;
+                    SFX.jump();
+                }
+
+                if (this.stomping) {
+                    this.vx = 0;
+                    this.vy = 24; // Unleashed style fast fall
+                    // Stomp collision
+                    for (const e of game.enemies) {
+                        if (!e.dead && this.x < e.x + e.w && this.x + this.w > e.x && this.y < e.y + e.h && this.y + this.h > e.y) {
+                            e.takeDamage(50, 0, true); // Massive stomp damage
+                            this.vy = -18; // Big bounce
+                            this.canDoubleJump = true;
+                            this.stomping = false; // End stomp state
+                            game.shake = 10; game.hitStop = 4;
+                            for (let i = 0; i < 20; i++) game.particles.push({ x: this.x + this.w / 2, y: this.y + this.h, vx: (Math.random() - .5) * 10, vy: -Math.random() * 5, life: 25, color: '#88ddff', size: 4 });
+                            SFX.stompBounce();
+                            break;
+                        }
+                    }
+                    if (game.boss && !game.boss.dead && this.x < game.boss.x + game.boss.w && this.x + this.w > game.boss.x && this.y < game.boss.y + game.boss.h && this.y + this.h > game.boss.y) {
+                        game.boss.takeDamage(50);
+                        this.vy = -18; this.canDoubleJump = true; this.stomping = false;
+                        game.shake = 10; game.hitStop = 4;
+                        for (let i = 0; i < 20; i++) game.particles.push({ x: this.x + this.w / 2, y: this.y + this.h, vx: (Math.random() - .5) * 10, vy: -Math.random() * 5, life: 25, color: '#88ddff', size: 4 });
+                        SFX.stompBounce();
+                    }
+                } else {
+                    this.vy += 0.55; if (this.vy > 14) this.vy = 14;
+                }
+
+                moveX(this, level);
+
+                this.checkWalls(level);
+                this.wallDir = 0;
+                if (!this.grounded && this.wallJumpLock <= 0 && !this.stomping) {
+                    if (this.touchingWallL) this.wallDir = -1;
+                    else if (this.touchingWallR) this.wallDir = 1;
+                }
+                if (this.wallJumpLock > 0) this.wallJumpLock--;
+
+                this.wallSliding = false;
+                if (this.wallDir !== 0 && this.vy > 0 && !this.guarding && !this.invModeActive && !this.stomping) {
+                    const pressingToward = (this.wallDir < 0 && Input.left()) || (this.wallDir > 0 && Input.right());
+                    if (pressingToward) {
+                        this.wallSliding = true; this.vy = Math.min(this.vy, 2.5);
+                        if (this.animTime % 5 === 0) {
+                            const sparkX = this.wallDir < 0 ? this.x : this.x + this.w;
+                            game.particles.push({ x: sparkX, y: this.y + Math.random() * this.h, vx: -this.wallDir * 1.5, vy: -Math.random() * 2, life: 12, color: '#ffcc44', size: 2 });
+                        }
+                    }
+                }
+
+                if (Input.jumpPressed()) this.jumpBuffer = 8;
+                if (this.jumpBuffer > 0) this.jumpBuffer--;
+                if (this.coyote > 0) this.coyote--;
+
+                if (this.jumpBuffer > 0 && !this.guarding && !this.invModeActive && !this.stomping) {
+                    if (this.grounded || this.coyote > 0) {
+                        this.vy = -13; this.grounded = false; this.coyote = 0; this.jumpBuffer = 0;
+                        this.canDoubleJump = true; SFX.jump();
+                    } else if (this.wallDir !== 0) {
+                        this.vy = -13;
+                        if (Input.left()) { this.vx = -9; this.facing = -1; }
+                        else if (Input.right()) { this.vx = 9; this.facing = 1; }
+                        else if (Input.up()) { this.vx *= 0.3; }
+                        else { this.vx = -this.wallDir * 9; this.facing = -this.wallDir; }
+                        this.canDoubleJump = true; this.jumpBuffer = 0; this.wallDir = 0; this.wallSliding = false;
+                        this.wallJumpLock = 8; SFX.wallJump();
+                        for (let i = 0; i < 10; i++) game.particles.push({ x: this.x + this.w / 2, y: this.y + this.h / 2, vx: (Math.random() - .5) * 8, vy: (Math.random() - .5) * 8, life: 20, color: '#aaddff', size: 3 });
+                    } else if (this.canDoubleJump && !this.sliding) {
+                        this.vy = -11; this.canDoubleJump = false; this.jumpBuffer = 0; SFX.jump();
+                        for (let i = 0; i < 6; i++) game.particles.push({ x: this.x + this.w / 2, y: this.y + this.h, vx: (Math.random() - .5) * 4, vy: Math.random() * 3, life: 15, color: '#88ddff', size: 2 });
+                    }
+                }
+
+                if (!Input.keys.Space && !Input.gpb[0] && this.vy < -4) this.vy *= 0.85;
+                if (this.grounded) this.coyote = 6;
+
+                moveY(this, level);
+
+                // ── Sonic Stomp Ground Impact ──
+                if (this.stomping && this.grounded) {
+                    this.stomping = false;
+                    game.shake = 12; game.hitStop = 2;
+                    SFX.stompGround();
+                    for (let i = 0; i < 20; i++) {
+                        const dir = i < 10 ? -1 : 1;
+                        game.particles.push({ x: this.x + this.w / 2, y: this.y + this.h, vx: dir * (Math.random() * 5 + 2), vy: -Math.random() * 3, life: 20, color: '#ffffff', size: 3 });
+                    }
+                    // Ground shockwave damage
+                    for (const e of game.enemies) {
+                        if (!e.dead) {
+                            const dx = (e.x + e.w / 2) - (this.x + this.w / 2);
+                            if (Math.abs(dx) < 60 && e.y + e.h > this.y + this.h - 20) {
+                                e.takeDamage(20, dx > 0 ? 1 : -1, true);
+                            }
+                        }
+                    }
+                }
+
+                if (this.shootCD > 0) this.shootCD--;
+                if (this.muzzleFlash > 0) this.muzzleFlash--;
+                if (Input.shootHeld() && this.shootCD <= 0 && !this.guarding && !this.invModeActive && !this.stomping) {
+                    this.shootCD = 9; this.muzzleFlash = 5;
+                    let bx, by, vx, vy;
+                    if (!this.grounded && Input.down() && !this.sliding) {
+                        bx = this.x + this.w / 2 - 2; by = this.y + this.h; vx = 0; vy = 14;
+                    } else {
+                        bx = this.x + (this.facing > 0 ? this.w : 0); by = this.y + (this.sliding ? 4 : 10); vx = this.facing * 12; vy = 0;
+                    }
+                    game.bullets.push({ x: bx, y: by, vx: vx, vy: vy, dmg: 10, life: 60, fromPlayer: true });
+                    SFX.shoot();
+                }
+
+                if (this.swordCD > 0) this.swordCD--;
+                if (this.swordActive > 0) this.swordActive--;
+                if (Input.swordPressed() && this.swordCD <= 0 && !this.guarding && !this.invModeActive && !this.stomping) {
+                    this.swordCD = 18; this.swordActive = 10; SFX.sword();
+                    const sx = this.x + (this.facing > 0 ? this.w : -30);
+                    const sy = this.y, sw = 35, sh = this.h;
+                    for (const e of game.enemies) {
+                        if (e.dead) continue;
+                        if (sx < e.x + e.w && sx + sw > e.x && sy < e.y + e.h && sy + sh > e.y) e.takeDamage(25, this.facing, true);
+                    }
+                    if (game.boss && !game.boss.dead) {
+                        const b = game.boss;
+                        if (sx < b.x + b.w && sx + sw > b.x && sy < b.y + b.h && sy + sh > b.y) b.takeDamage(25);
+                    }
+                }
+
+                if (this.grenadeCD > 0) this.grenadeCD--;
+                if (this.grenadeRegen > 0) this.grenadeRegen--;
+                else if (this.grenades < 3) { this.grenades++; this.grenadeRegen = 1200; }
+
+                if (Input.grenadePressed() && this.grenades > 0 && this.grenadeCD <= 0 && !this.invModeActive && !this.stomping) {
+                    this.grenades--; this.grenadeCD = 30;
+                    game.grenades.push({ x: this.x + this.w / 2, y: this.y + 10, vx: this.facing * 6 + this.vx * 0.5, vy: -6, timer: 60, life: 1 });
+                    SFX.shoot();
+                }
+
+                if (Input.stimPressed() && this.stims > 0 && this.stimHeal <= 0 && this.hp < this.maxHp) {
+                    this.stims--; this.stimHeal = 30; SFX.stim();
+                }
+                if (this.stimHeal > 0) { this.hp = Math.min(this.maxHp, this.hp + 1); this.stimHeal--; }
+
+                if (this.grappleCD > 0) this.grappleCD--;
+                if (Input.grapplePressed() && this.grappleCD <= 0 && !this.grappling && !this.guarding && !this.invModeActive && !this.stomping) {
+                    let ax, ay;
+                    if (Input.gp && (Math.abs(Input.axes.rx) > .2 || Math.abs(Input.axes.ry) > .2)) {
+                        ax = Input.axes.rx; ay = Input.axes.ry;
+                    } else {
+                        const dx = Input.mx - (this.x + this.w / 2 - game.cam.x);
+                        const dy = Input.my - (this.y + this.h / 2 - game.cam.y);
+                        const m = Math.hypot(dx, dy) || 1; ax = dx / m; ay = dy / m;
+                    }
+                    const range = 300;
+                    let bestX = -1, bestY = -1, bestDist = range;
+                    for (let d = 10; d < range; d += 8) {
+                        const tx = Math.floor((this.x + this.w / 2 + ax * d) / TILE);
+                        const ty = Math.floor((this.y + this.h / 2 + ay * d) / TILE);
+                        if (isSolid(tileAt(level, tx, ty))) {
+                            const dx2 = tx * TILE + TILE / 2 - (this.x + this.w / 2);
+                            const dy2 = ty * TILE + TILE / 2 - (this.y + this.h / 2);
+                            const dist = Math.hypot(dx2, dy2);
+                            if (dist < bestDist) { bestDist = dist; bestX = tx * TILE + TILE / 2; bestY = ty * TILE + TILE / 2; }
+                            break;
+                        }
+                    }
+                    if (bestX >= 0) { this.grappling = true; this.grappleX = bestX; this.grappleY = bestY; this.grappleCD = 120; SFX.grapple(); }
+                }
+                if (this.grappling) {
+                    const dx = this.grappleX - (this.x + this.w / 2);
+                    const dy = this.grappleY - (this.y + this.h / 2);
+                    const d = Math.hypot(dx, dy);
+                    if (d < 20 || Input.jumpPressed() || !Input.keys.KeyE && !(Input.gpb[4])) {
+                        this.grappling = false;
+                        if (Input.jumpPressed()) this.vy = -10;
+                    } else {
+                        this.vx = (dx / d) * 15; this.vy = (dy / d) * 15;
+                        this.x += this.vx; this.y += this.vy; this.grounded = false;
+                    }
+                }
+
+                if (this.invuln > 0) {
+                    this.invuln--; this.regenTimer = 180; this.regenActive = false;
+                } else {
+                    if (this.regenTimer > 0) this.regenTimer--;
+                    else if (this.hp < this.maxHp) { this.regenActive = true; this.hp = Math.min(this.maxHp, this.hp + 0.5); }
+                    else this.regenActive = false;
+                }
+
+                if (this.y > level.height * TILE + 100) this.takeDamage(100, 0, true);
+
+                const cx = Math.floor((this.x + this.w / 2) / TILE);
+                const cy = Math.floor((this.y + this.h / 2) / TILE);
+                if (isGoal(tileAt(level, cx, cy)) || isGoal(tileAt(level, Math.floor(this.x / TILE), Math.floor((this.y + this.h / 2) / TILE))) || isGoal(tileAt(level, Math.floor((this.x + this.w - 1) / TILE), Math.floor((this.y + this.h / 2) / TILE)))) {
+                    game.levelComplete();
+                }
+
+                if (!level.isBoss) {
+                    for (let i = 0; i < level.checkpoints.length; i++) {
+                        if (this.x > level.checkpoints[i]) {
+                            level._cpHit = level._cpHit || [];
+                            if (!level._cpHit[i]) { level._cpHit[i] = true; level._lastCP = level.checkpoints[i]; SFX.select(); }
+                        }
+                    }
+                }
+            }
+
+            takeDamage(amt, dir, ignoreInvuln) {
+                if (this.invModeActive) return;
+                if (this.invuln > 0 && !ignoreInvuln) return;
+
+                if (this.guarding && !ignoreInvuln) {
+                    this.guard -= amt * 1.5;
+                    SFX.guard(); game.shake = 4;
+                    for (let i = 0; i < 5; i++) game.particles.push({ x: this.x + this.w / 2, y: this.y + this.h / 2, vx: dir * -3 + Math.random() * 2, vy: Math.random() * 2 - 1, life: 15, color: this.guardColor(), size: 4 });
+                    if (this.guard <= 0) {
+                        this.guard = 0; this.guarding = false;
+                        this.guardBreakStun = 60;
+                        this.hp -= amt; this.invuln = 60; this.regenTimer = 180; this.regenActive = false;
+                        this.vx = dir * 6; this.vy = -6;
+                        SFX.guardBreak(); game.shake = 15;
+                        if (this.hp <= 0) { this.hp = 0; game.playerDie(); }
+                    } else {
+                        this.invuln = 10; this.regenTimer = 60;
+                        this.vx = dir * 2;
+                    }
+                    return;
+                }
+
+                this.hp -= amt;
+                this.invuln = 60; this.hitStun = 15;
+                this.regenTimer = 180; this.regenActive = false;
+                this.combo = 0;
+                this.stomping = false;
+                this.vx = dir * 4; this.vy = -5;
+                SFX.damage(); game.shake = 10;
+                if (this.hp <= 0) { this.hp = 0; game.playerDie(); }
+            }
+            takeSpikeDamage() { this.takeDamage(100, 0, true); }
+
+            draw(ctx, cam) {
+                const x = this.x - cam.x, y = this.y - cam.y;
+                if (this.invuln > 0 && Math.floor(this.invuln / 4) % 2 === 0 && !this.invModeActive) return;
+
+                if (this.invModeActive) {
+                    ctx.fillStyle = `rgba(255, 215, 0, ${0.4 + Math.sin(this.animTime * .3) * 0.2})`;
+                    ctx.fillRect(x - 8, y - 8, this.w + 16, this.h + 16);
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(x - 8, y - 8, this.w + 16, this.h + 16);
+                }
+
+                if (this.regenActive) {
+                    ctx.fillStyle = `rgba(80,255,80,${.15 + Math.sin(this.animTime * .15) * .1})`;
+                    ctx.fillRect(x - 6, y - 6, this.w + 12, this.h + 12);
+                }
+
+                if (this.guarding && this.guard > 0) {
+                    const color = this.guardColor();
+                    ctx.strokeStyle = color; ctx.lineWidth = 2;
+                    ctx.globalAlpha = 0.6 + Math.sin(this.animTime * 0.3) * 0.2;
+                    ctx.beginPath(); ctx.arc(x + this.w / 2, y + this.h / 2, this.w, 0, Math.PI * 2); ctx.stroke();
+                    ctx.globalAlpha = 0.15; ctx.fillStyle = color; ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
+
+                if (this.grappling) {
+                    ctx.strokeStyle = '#aaccee'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(x + this.w / 2, y + this.h / 2);
+                    ctx.lineTo(this.grappleX - cam.x, this.grappleY - cam.y); ctx.stroke();
+                }
+
+                const f = this.facing;
+                const slide = this.sliding;
+                const ws = this.wallSliding;
+
+                if (this.boosting) {
+                    ctx.fillStyle = 'rgba(100,200,255,.2)';
+                    for (let i = 1; i <= 4; i++) ctx.fillRect(x - f * i * 6, y + (slide ? 2 : 2), this.w, this.h - (slide ? 0 : 2));
+                }
+
+                // ── Sonic Stomp Visuals ──
+                if (this.stomping) {
+                    ctx.fillStyle = 'rgba(100, 200, 255, 0.4)';
+                    ctx.fillRect(x - 2, y - 16, this.w + 4, 16);
+                    ctx.fillStyle = 'rgba(200, 230, 255, 0.7)';
+                    ctx.fillRect(x + 2, y - 24, this.w - 4, 24);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.moveTo(x + this.w / 2 - 8, y + this.h);
+                    ctx.lineTo(x + this.w / 2 + 8, y + this.h);
+                    ctx.lineTo(x + this.w / 2, y + this.h + 12);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                ctx.fillStyle = '#1a2a5a';
+                if (slide) ctx.fillRect(x, y + 2, this.w + 4, 12);
+                else if (ws) { ctx.fillRect(x + (f > 0 ? 1 : -1), y + 10, this.w - 4, 14); }
+                else ctx.fillRect(x + 2, y + 10, this.w - 4, 14);
+
+                ctx.fillStyle = '#3a6acc';
+                if (!slide && !ws) ctx.fillRect(x + 4, y + 12, this.w - 8, 4);
+
+                ctx.fillStyle = '#4a9aff';
+                if (slide) ctx.fillRect(x + 2, y - 2, this.w, 8);
+                else { ctx.fillRect(x + 2, y, this.w - 4, 11); }
+
+                ctx.fillStyle = '#aaddff';
+                if (slide) ctx.fillRect(x + (f > 0 ? 6 : 0), y, this.w - 8, 3);
+                else if (ws) ctx.fillRect(x + (f > 0 ? 6 : 0), y + 3, 8, 3);
+                else ctx.fillRect(x + (f > 0 ? 7 : 3), y + 3, 8, 3);
+
+                ctx.fillStyle = '#ffffff';
+                if (!slide && !ws) ctx.fillRect(x + (f > 0 ? 9 : 4), y + 4, 2, 2);
+
+                ctx.fillStyle = '#15264a';
+                if (!slide && !ws) {
+                    const walk = this.grounded && Math.abs(this.vx) > .3 ? Math.floor(this.animTime / 6) % 2 : 0;
+                    if (walk) { ctx.fillRect(x + 2, y + 22, 6, 6); ctx.fillRect(x + 10, y + 22, 6, 4); }
+                    else { ctx.fillRect(x + 2, y + 22, 6, 6); ctx.fillRect(x + 10, y + 22, 6, 6); }
+                }
+                if (ws) {
+                    ctx.fillRect(x + (f > 0 ? 1 : 5), y + 20, 4, 8);
+                    ctx.fillRect(x + (f > 0 ? 10 : 8), y + 18, 4, 8);
+                }
+
+                ctx.fillStyle = '#3a6acc';
+                if (!slide && !ws) {
+                    const ax = f > 0 ? x + this.w - 3 : x - 1;
+                    ctx.fillRect(ax, y + 12, 4, 8);
+                    if (this.muzzleFlash > 0) {
+                        if (!this.grounded && Input.down()) {
+                            ctx.fillStyle = '#ffee44'; ctx.fillRect(x + this.w / 2 - 3, y + this.h, 6, 6);
+                            ctx.fillStyle = '#ffffff'; ctx.fillRect(x + this.w / 2 - 1, y + this.h + 2, 2, 4);
+                        } else {
+                            ctx.fillStyle = '#ffee44'; ctx.fillRect(f > 0 ? x + this.w : x - 6, y + 10, 6, 10);
+                            ctx.fillStyle = '#ffffff'; ctx.fillRect(f > 0 ? x + this.w + 1 : x - 4, y + 12, 3, 6);
+                        }
+                    }
+                }
+
+                if (this.swordActive > 0) {
+                    ctx.strokeStyle = '#aaddff'; ctx.lineWidth = 3;
+                    ctx.globalAlpha = this.swordActive / 10;
+                    ctx.beginPath();
+                    const cx = x + (f > 0 ? this.w : 0), cy = y + 14;
+                    ctx.arc(cx, cy, 30, f > 0 ? -Math.PI / 3 : Math.PI - Math.PI / 3, f > 0 ? Math.PI / 3 : Math.PI + Math.PI / 3);
+                    ctx.stroke();
+                    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 28, f > 0 ? -Math.PI / 3 : Math.PI - Math.PI / 3, f > 0 ? Math.PI / 3 : Math.PI + Math.PI / 3);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                }
+
+                if (ws) {
+                    ctx.fillStyle = 'rgba(255,200,100,.6)';
+                    const ax = f > 0 ? x + this.w + 2 : x - 6;
+                    ctx.beginPath();
+                    ctx.moveTo(ax, y + 12); ctx.lineTo(ax + (f > 0 ? 4 : -4), y + 16); ctx.lineTo(ax, y + 20);
+                    ctx.closePath(); ctx.fill();
+                }
+
+                if (this.boosting) {
+                    ctx.strokeStyle = 'rgba(100,200,255,.5)'; ctx.lineWidth = 2;
+                    ctx.strokeRect(x - 2, y - 2, this.w + 4, this.h + 4);
+                }
+
+                if (this.stimHeal > 0) {
+                    ctx.fillStyle = `rgba(80,255,80,${this.stimHeal / 30 * .4})`;
+                    ctx.fillRect(x - 4, y - 4, this.w + 8, this.h + 8);
+                }
+
+                if (this.guardBreakStun > 0) {
+                    ctx.fillStyle = `rgba(255, 50, 50, ${this.guardBreakStun / 60})`;
+                    ctx.fillRect(x - 4, y - 4, this.w + 8, this.h + 8);
+                }
+            }
+        }
+
+        // ── Enemy ──
+        class Enemy {
+            constructor(x, y, type, level) {
+                this.x = x; this.y = y; this.type = type; this.dead = false;
+                this.vx = 0; this.vy = 0; this.facing = -1; this.grounded = false;
+                this.hitWallL = false; this.hitWallR = false;
+                this.animTime = Math.random() * 100; this.flashTimer = 0;
+                this.shootCD = 60 + Math.random() * 60;
+                this.swordWindup = 0; this.swordActive = 0; this.swordCD = 0;
+                this.patrolDir = Math.random() < .5 ? -1 : 1;
+                this.stunTimer = 0;
+                switch (type) {
+                    case 'gunner': this.w = 20; this.h = 26; this.hp = 30; this.maxhp = 30; this.dmg = 10; break;
+                    case 'swordsman': this.w = 22; this.h = 28; this.hp = 45; this.maxhp = 45; this.dmg = 20; break;
+                    case 'sniper': this.w = 18; this.h = 24; this.hp = 20; this.maxhp = 20; this.dmg = 15; break;
+                    case 'chaser': this.w = 18; this.h = 22; this.hp = 25; this.maxhp = 25; this.dmg = 15; break;
+                    case 'turret': this.w = 24; this.h = 24; this.hp = 50; this.maxhp = 50; this.dmg = 10; break;
+                }
+            }
+            update(level, player) {
+                if (this.dead) return;
+                this.animTime++;
+                if (this.flashTimer > 0) this.flashTimer--;
+
+                if (this.stunTimer > 0) {
+                    this.stunTimer--;
+                    this.vx *= 0.9;
+                    this.vy += 0.55; if (this.vy > 14) this.vy = 14;
+                    moveX(this, level); moveY(this, level);
+                    return;
+                }
+
+                this.hitWallL = false; this.hitWallR = false;
+                const dx = player.x - this.x, dy = player.y - this.y;
+                const dist = Math.hypot(dx, dy);
+                this.facing = dx > 0 ? 1 : -1;
+
+                switch (this.type) {
+                    case 'gunner':
+                        this.vx = this.patrolDir * 1.2;
+                        if (this.hitWallL || this.hitWallR) this.patrolDir *= -1;
+                        const ex = this.x + (this.patrolDir > 0 ? this.w + 2 : -2);
+                        const ey = this.y + this.h + 4;
+                        if (!isSolid(tileAt(level, Math.floor(ex / TILE), Math.floor(ey / TILE)))) this.patrolDir *= -1;
+                        this.shootCD--;
+                        if (this.shootCD <= 0 && Math.abs(dy) < 80 && dist < 400) {
+                            this.shootCD = 90;
+                            game.bullets.push({ x: this.x + this.w / 2, y: this.y + 10, vx: Math.sign(dx) * 7, vy: 0, dmg: this.dmg, life: 80, fromPlayer: false });
+                        }
+                        break;
+                    case 'swordsman':
+                        if (Math.abs(dx) > 30) { this.vx = Math.sign(dx) * 2.5; }
+                        else { this.vx = 0; this.swordCD--; if (this.swordCD <= 0) { this.swordWindup = 25; this.swordCD = 90; } }
+                        if (this.swordWindup > 0) { this.swordWindup--; this.vx = 0; if (this.swordWindup === 0) { this.swordActive = 15; SFX.sword(); } }
+                        if (this.swordActive > 0) {
+                            this.swordActive--;
+                            const sx = this.x + (this.facing > 0 ? this.w : -25);
+                            if (sx < player.x + player.w && sx + 25 > player.x && this.y < player.y + player.h && this.y + this.h > player.y) player.takeDamage(this.dmg, this.facing);
+                        }
+                        if (this.hitWallL || this.hitWallR) { if (this.grounded) this.vy = -10; }
+                        break;
+                    case 'sniper':
+                        this.vx = 0; this.shootCD--;
+                        if (this.shootCD <= 0 && dist < 500) {
+                            this.shootCD = 120;
+                            const mx = player.x + player.w / 2, my = player.y + player.h / 2;
+                            const sx = this.x + this.w / 2, sy = this.y + 10;
+                            const m = Math.hypot(mx - sx, my - sy) || 1;
+                            game.bullets.push({ x: sx, y: sy, vx: (mx - sx) / m * 8, vy: (my - sy) / m * 8, dmg: this.dmg, life: 100, fromPlayer: false });
+                            SFX.shoot();
+                        }
+                        break;
+                    case 'chaser':
+                        this.vx = Math.sign(dx) * 4;
+                        if (this.hitWallL || this.hitWallR) { if (this.grounded) this.vy = -9; }
+                        if (this.x < player.x + player.w && this.x + this.w > player.x && this.y < player.y + player.h && this.y + this.h > player.y) player.takeDamage(this.dmg, this.facing);
+                        break;
+                    case 'turret':
+                        this.vx = 0; this.shootCD--;
+                        if (this.shootCD <= 0 && dist < 450) {
+                            this.shootCD = 80;
+                            for (let a = -1; a <= 1; a++) {
+                                const mx = player.x + player.w / 2, my = player.y + player.h / 2;
+                                const sx = this.x + this.w / 2, sy = this.y + 10;
+                                const m = Math.hypot(mx - sx, my - sy) || 1;
+                                const baseA = Math.atan2(my - sy, mx - sx), sp = 6;
+                                game.bullets.push({ x: sx, y: sy, vx: Math.cos(baseA + a * .25) * sp, vy: Math.sin(baseA + a * .25) * sp, dmg: this.dmg, life: 100, fromPlayer: false });
+                            }
+                            SFX.shoot();
+                        }
+                        break;
+                }
+                this.vy += 0.55; if (this.vy > 14) this.vy = 14;
+                moveX(this, level); moveY(this, level);
+            }
+            takeDamage(amt, dir, heavy) {
+                if (this.dead) return;
+                this.hp -= amt;
+                this.flashTimer = 8;
+                this.stunTimer = heavy ? 15 : 5;
+                this.vx = dir * (heavy ? 10 : 3);
+                this.vy = heavy ? -6 : -2;
+                SFX.enemyHit();
+
+                if (!game.player.invModeActive || amt < 9999) game.player.addCombo(1);
+
+                if (this.hp <= 0 && !this.dead) {
+                    this.dead = true; SFX.enemyDie();
+                    game.score += 100 + Math.floor(game.player.combo * 10);
+                    game.enemiesKilled++;
+                    if (!game.player.invModeActive) game.player.addCombo(2);
+                    game.player.invCharge = Math.min(100, game.player.invCharge + 10);
+                    for (let i = 0; i < 10; i++) game.particles.push({ x: this.x + this.w / 2, y: this.y + this.h / 2, vx: (Math.random() - .5) * 6, vy: (Math.random() - .5) * 6 - 2, life: 30, color: '#ff8844', size: 3 });
+                }
+            }
+            draw(ctx, cam) {
+                if (this.dead) return;
+                const x = this.x - cam.x, y = this.y - cam.y;
+                const flash = this.flashTimer > 0;
+                switch (this.type) {
+                    case 'gunner': {
+                        ctx.fillStyle = flash ? '#ffffff' : '#aa3322'; ctx.fillRect(x + 2, y + 8, this.w - 4, 14);
+                        ctx.fillStyle = flash ? '#ffffff' : '#dd4433'; ctx.fillRect(x + 3, y, this.w - 6, 10);
+                        ctx.fillStyle = '#ffff44'; ctx.fillRect(x + (this.facing > 0 ? 10 : 4), y + 3, 4, 3);
+                        ctx.fillStyle = '#666'; ctx.fillRect(this.facing > 0 ? x + this.w - 2 : x - 4, y + 12, 6, 5);
+                        ctx.fillStyle = flash ? '#ffffff' : '#882211'; ctx.fillRect(x + 2, y + 20, 6, 6); ctx.fillRect(x + 12, y + 20, 6, 6);
+                        if (this.hp < this.maxhp) { ctx.fillStyle = '#330000'; ctx.fillRect(x, y - 6, this.w, 3); ctx.fillStyle = '#ff4444'; ctx.fillRect(x, y - 6, this.w * (this.hp / this.maxhp), 3); }
+                        break;
+                    }
+                    case 'swordsman': {
+                        ctx.fillStyle = flash ? '#ffffff' : '#6622aa'; ctx.fillRect(x + 2, y + 8, this.w - 4, 14);
+                        ctx.fillStyle = flash ? '#ffffff' : '#8844cc'; ctx.fillRect(x + 3, y, this.w - 6, 10);
+                        ctx.fillStyle = '#ff3333'; ctx.fillRect(x + 4, y + 3, this.w - 8, 3);
+                        ctx.fillStyle = '#eeeeff';
+                        const sw = this.swordActive > 0 ? 22 : 16;
+                        if (this.facing > 0) ctx.fillRect(x + this.w, y + 10, sw, 3);
+                        else ctx.fillRect(x - sw, y + 10, sw, 3);
+                        if (this.swordActive > 0) {
+                            ctx.fillStyle = 'rgba(170,200,255,.5)';
+                            if (this.facing > 0) ctx.fillRect(x + this.w, y + 8, sw + 4, 7);
+                            else ctx.fillRect(x - sw - 4, y + 8, sw + 4, 7);
+                        }
+                        if (this.swordWindup > 0) {
+                            ctx.fillStyle = '#ff8800'; ctx.globalAlpha = .5 + Math.sin(this.animTime * .5) * .3;
+                            ctx.fillRect(this.facing > 0 ? x + this.w : x - 22, y + 8, 22, 8);
+                            ctx.globalAlpha = 1;
+                        }
+                        ctx.fillStyle = flash ? '#ffffff' : '#441188'; ctx.fillRect(x + 2, y + 20, 7, 8); ctx.fillRect(x + 13, y + 20, 7, 8);
+                        if (this.hp < this.maxhp) { ctx.fillStyle = '#330000'; ctx.fillRect(x, y - 6, this.w, 3); ctx.fillStyle = '#ff4444'; ctx.fillRect(x, y - 6, this.w * (this.hp / this.maxhp), 3); }
+                        break;
+                    }
+                    case 'sniper': {
+                        ctx.fillStyle = flash ? '#ffffff' : '#226633'; ctx.fillRect(x + 3, y + 6, this.w - 6, 14);
+                        ctx.fillStyle = flash ? '#ffffff' : '#33aa55'; ctx.fillRect(x + 4, y, this.w - 8, 8);
+                        ctx.fillStyle = '#ffaa00'; ctx.fillRect(x + (this.facing > 0 ? 9 : 3), y + 2, 4, 3);
+                        ctx.fillStyle = '#555'; ctx.fillRect(this.facing > 0 ? x + this.w - 1 : x - 9, y + 8, 10, 3);
+                        if (this.hp < this.maxhp) { ctx.fillStyle = '#330000'; ctx.fillRect(x, y - 6, this.w, 3); ctx.fillStyle = '#ff4444'; ctx.fillRect(x, y - 6, this.w * (this.hp / this.maxhp), 3); }
+                        break;
+                    }
+                    case 'chaser': {
+                        ctx.fillStyle = flash ? '#ffffff' : '#ccaa22'; ctx.fillRect(x + 2, y + 4, this.w - 4, 16);
+                        ctx.fillStyle = flash ? '#ffffff' : '#ffdd44'; ctx.fillRect(x + 3, y, this.w - 6, 8);
+                        ctx.fillStyle = flash ? '#ffffff' : '#aa8811';
+                        ctx.fillRect(x + 2, y - 3, 3, 4); ctx.fillRect(x + 12, y - 3, 3, 4);
+                        ctx.fillStyle = '#ff0000'; ctx.fillRect(x + (this.facing > 0 ? 9 : 4), y + 2, 3, 3);
+                        ctx.fillStyle = flash ? '#ffffff' : '#886611'; ctx.fillRect(x + 2, y + 18, 6, 4); ctx.fillRect(x + 10, y + 18, 6, 4);
+                        if (this.hp < this.maxhp) { ctx.fillStyle = '#330000'; ctx.fillRect(x, y - 6, this.w, 3); ctx.fillStyle = '#ff4444'; ctx.fillRect(x, y - 6, this.w * (this.hp / this.maxhp), 3); }
+                        break;
+                    }
+                    case 'turret': {
+                        ctx.fillStyle = flash ? '#ffffff' : '#555566'; ctx.fillRect(x, y + 4, this.w, this.h - 4);
+                        ctx.fillStyle = flash ? '#ffffff' : '#777788'; ctx.fillRect(x + 2, y, this.w - 4, 8);
+                        ctx.fillStyle = '#444';
+                        const cx = x + this.w / 2, cy = y + 12;
+                        const ang = Math.atan2((game.player.y + game.player.h / 2) - (this.y + 12), (game.player.x + game.player.w / 2) - (this.x + this.w / 2));
+                        ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang); ctx.fillRect(0, -2, 14, 4); ctx.restore();
+                        ctx.fillStyle = '#ff4444'; ctx.fillRect(x + 8, y + 8, 8, 4);
+                        if (this.hp < this.maxhp) { ctx.fillStyle = '#330000'; ctx.fillRect(x, y - 6, this.w, 3); ctx.fillStyle = '#ff4444'; ctx.fillRect(x, y - 6, this.w * (this.hp / this.maxhp), 3); }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // ── Boss ──
+        class Boss {
+            constructor(x, y, num) {
+                this.x = x; this.y = y; this.w = 48; this.h = 56; this.num = num;
+                this.vx = 0; this.vy = 0; this.facing = -1; this.grounded = false;
+                this.hp = 200 + num * 15; this.maxhp = this.hp;
+                this.dead = false; this.flashTimer = 0; this.phase = 0;
+                this.attackTimer = 120; this.attackState = 'idle';
+                this.animTime = 0; this.shootTimer = 0; this.shootCount = 0;
+                this.name = BOSS_NAMES[Math.ceil(num / 5)] || 'BOSS'; this.invuln = 0;
+                this.hitWallL = false; this.hitWallR = false; this.stunTimer = 0;
+            }
+            update(level, player) {
+                if (this.dead) return;
+                this.animTime++;
+                if (this.flashTimer > 0) this.flashTimer--;
+                if (this.invuln > 0) this.invuln--;
+
+                if (this.stunTimer > 0) {
+                    this.stunTimer--; this.vx *= 0.9;
+                    this.vy += 0.55; if (this.vy > 14) this.vy = 14;
+                    moveX(this, level); moveY(this, level);
+                    return;
+                }
+
+                const dx = player.x - this.x, dy = player.y - this.y;
+                const dist = Math.hypot(dx, dy);
+                this.facing = dx > 0 ? 1 : -1;
+                const hpPct = this.hp / this.maxhp;
+                this.phase = hpPct > .66 ? 0 : hpPct > .33 ? 1 : 2;
+                this.attackTimer--;
+                if (this.attackTimer <= 0) {
+                    const attacks = ['shoot', 'rush', 'jump'];
+                    if (this.phase >= 1) attacks.push('spread');
+                    if (this.phase >= 2) attacks.push('rapid', 'summon');
+                    this.startAttack(attacks[Math.floor(Math.random() * attacks.length)]);
+                }
+                if (this.attackState === 'shoot') {
+                    this.shootTimer--;
+                    if (this.shootTimer <= 0) {
+                        const mx = player.x + player.w / 2, my = player.y + player.h / 2;
+                        const sx = this.x + this.w / 2, sy = this.y + 20;
+                        const m = Math.hypot(mx - sx, my - sy) || 1;
+                        game.bullets.push({ x: sx, y: sy, vx: (mx - sx) / m * 7, vy: (my - sy) / m * 7, dmg: 12, life: 100, fromPlayer: false });
+                        SFX.shoot(); this.shootTimer = this.phase >= 2 ? 20 : 30; this.shootCount--;
+                        if (this.shootCount <= 0) { this.attackState = 'idle'; this.attackTimer = 60 + Math.random() * 40; }
+                    }
+                    this.vx *= 0.9;
+                }
+                if (this.attackState === 'rush') {
+                    this.vx = this.facing * (5 + this.phase * 1.5);
+                    if (this.hitWallL || this.hitWallR) { this.attackState = 'idle'; this.attackTimer = 60; this.vx = 0; game.shake = 8; }
+                }
+                if (this.attackState === 'jump') { if (this.grounded) { this.vy = -14; this.vx = this.facing * 3; } this.attackState = 'falling'; }
+                if (this.attackState === 'falling') {
+                    if (this.grounded) {
+                        this.attackState = 'idle'; this.attackTimer = 60; game.shake = 12;
+                        for (let a = 0; a < 6; a++) { const ang = Math.PI + a * Math.PI / 5; game.bullets.push({ x: this.x + this.w / 2, y: this.y + this.h, vx: Math.cos(ang) * 5, vy: -Math.sin(ang) * 3, dmg: 10, life: 80, fromPlayer: false }); }
+                        this.vx = 0;
+                    }
+                }
+                if (this.attackState === 'spread') {
+                    this.shootTimer--;
+                    if (this.shootTimer <= 0) {
+                        for (let a = -2; a <= 2; a++) { const ang = Math.PI + a * 0.2, sp = 5; game.bullets.push({ x: this.x + this.w / 2, y: this.y + 20, vx: Math.cos(ang) * sp * this.facing, vy: Math.sin(ang) * sp, dmg: 10, life: 100, fromPlayer: false }); }
+                        SFX.shoot(); this.shootCount--; this.shootTimer = 15;
+                        if (this.shootCount <= 0) { this.attackState = 'idle'; this.attackTimer = 80; }
+                    }
+                    this.vx *= 0.9;
+                }
+                if (this.attackState === 'rapid') {
+                    this.shootTimer--;
+                    if (this.shootTimer <= 0) {
+                        const mx = player.x + player.w / 2, my = player.y + player.h / 2;
+                        const sx = this.x + this.w / 2, sy = this.y + 20;
+                        const m = Math.hypot(mx - sx, my - sy) || 1;
+                        game.bullets.push({ x: sx, y: sy, vx: (mx - sx) / m * 9, vy: (my - sy) / m * 9, dmg: 8, life: 100, fromPlayer: false });
+                        SFX.shoot(); this.shootCount--; this.shootTimer = 6;
+                        if (this.shootCount <= 0) { this.attackState = 'idle'; this.attackTimer = 90; }
+                    }
+                    this.vx *= 0.9;
+                }
+                if (this.attackState === 'summon') {
+                    if (this.shootCount > 0) {
+                        game.enemies.push(new Enemy(this.x + (Math.random() - .5) * 100, this.y - 40, 'chaser', level));
+                        this.shootCount--; SFX.enemyDie();
+                    } else { this.attackState = 'idle'; this.attackTimer = 100; }
+                }
+                if (this.attackState === 'idle') { this.vx *= 0.9; if (Math.abs(dx) > 200) this.vx = this.facing * 1.5; }
+                this.vy += 0.55; if (this.vy > 14) this.vy = 14;
+                moveX(this, level); moveY(this, level);
+                if (this.x < player.x + player.w && this.x + this.w > player.x && this.y < player.y + player.h && this.y + this.h > player.y) player.takeDamage(15, this.facing);
+            }
+            startAttack(atk) { this.attackState = atk; this.shootCount = 3 + this.phase; this.shootTimer = 10; if (atk === 'summon') this.shootCount = 1 + this.phase; }
+            takeDamage(amt) {
+                if (this.invuln > 0) return;
+                this.hp -= amt; this.flashTimer = 6; this.invuln = 4; this.stunTimer = 3; SFX.enemyHit();
+                if (!game.player.invModeActive || amt < 9999) game.player.addCombo(1);
+                if (this.hp <= 0 && !this.dead) {
+                    this.dead = true; SFX.complete(); game.shake = 30;
+                    for (let i = 0; i < 40; i++) game.particles.push({ x: this.x + this.w / 2, y: this.y + this.h / 2, vx: (Math.random() - .5) * 12, vy: (Math.random() - .5) * 12 - 3, life: 50, color: i % 2 ? '#ffaa44' : '#ff4422', size: 4 });
+                    game.score += 1000; game.bossDefeated = true;
+                    game.player.invCharge = Math.min(100, game.player.invCharge + 50);
+                }
+            }
+            draw(ctx, cam) {
+                if (this.dead) return;
+                const x = this.x - cam.x, y = this.y - cam.y;
+                const flash = this.flashTimer > 0;
+                const ti = (this.num - 1) % 8, th = THEMES[ti];
+                ctx.fillStyle = flash ? '#ffffff' : th.tl; ctx.fillRect(x + 4, y + 16, this.w - 8, this.h - 16);
+                ctx.fillStyle = flash ? '#ffffff' : th.tl2; ctx.fillRect(x + 6, y + 18, this.w - 12, this.h - 20);
+                ctx.fillStyle = flash ? '#ffffff' : th.ac; ctx.fillRect(x + 8, y, this.w - 16, 18);
+                ctx.fillStyle = flash ? '#ffffff' : th.gl; ctx.fillRect(x + 10, y + 2, this.w - 20, 14);
+                ctx.fillStyle = '#ff0000'; ctx.fillRect(x + (this.facing > 0 ? 24 : 8), y + 6, 6, 4); ctx.fillRect(x + (this.facing > 0 ? 32 : 16), y + 6, 6, 4);
+                ctx.fillStyle = flash ? '#ffffff' : th.tl; ctx.fillRect(this.facing > 0 ? x + this.w - 6 : x, y + 20, 6, 16);
+                ctx.fillStyle = th.dg; ctx.fillRect(x + this.w / 2 - 6, y + 24, 12, 12);
+                ctx.fillStyle = th.gl; ctx.fillRect(x + this.w / 2 - 4, y + 26, 8, 8);
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(x + this.w / 2 - 2, y + 28, 4, 4);
+                ctx.fillStyle = flash ? '#ffffff' : th.tl2; ctx.fillRect(x + 4, y + this.h - 8, 14, 8); ctx.fillRect(x + this.w - 18, y + this.h - 8, 14, 8);
+                if (this.attackState === 'rush') { ctx.fillStyle = 'rgba(255,100,0,.3)'; ctx.fillRect(this.facing > 0 ? x + this.w : x - 60, y, 60, this.h); }
+            }
+        }
+
+        // ── Game ──
+        const game = {
+            state: 'title', level: 1, player: null, enemies: [], bullets: [], particles: [], grenades: [],
+            boss: null, bossDefeated: false, levelData: null, cam: { x: 0, y: 0 }, shake: 0, flash: 0, hitStop: 0,
+            score: 0, enemiesKilled: 0, totalTime: 0, levelTime: 0,
+            saveData: Save.load(), titleAnim: 0, selectCursor: 0, completeTimer: 0,
+            _bossCompleteTimer: null,
+
+            start() { Input.init(); this.loop(); },
+
+            startLevel(num) {
+                this.level = num;
+                this.levelData = genLevel(num);
+                this.player = new Player(this.levelData.startX, this.levelData.startY);
+                this.enemies = this.levelData.enemies.map(e => new Enemy(e.x, e.y, e.type, this.levelData));
+                this.bullets = []; this.particles = []; this.grenades = []; this.boss = null; this.bossDefeated = false;
+                if (this.levelData.isBoss) { this.boss = new Boss(this.levelData.boss.x, this.levelData.boss.y, num); SFX.boss(); }
+                this.cam.x = 0; this.cam.y = 0; this.levelTime = 0; this.state = 'playing';
+            },
+
+            levelComplete() {
+                if (this.state !== 'playing') return;
+                this.state = 'complete'; this.completeTimer = 0; SFX.complete();
+                if (!this.saveData.cmp.includes(this.level)) this.saveData.cmp.push(this.level);
+                if (this.level + 1 > this.saveData.hu) this.saveData.hu = this.level + 1;
+                this.saveData.sc = this.score; Save.save(this.saveData);
+                if (this.level >= 50) this.state = 'victory';
+            },
+
+            playerDie() { this.state = 'dead'; this.shake = 20; },
+
+            update() {
+                Input.update(); AC.init(); this.titleAnim++;
+
+                if (this.hitStop > 0) {
+                    this.hitStop--;
+                    Input.postUpdate();
+                    return;
+                }
+
+                if (this.state === 'title') { if (Input.startPressed()) { SFX.select(); this.state = 'select'; } }
+                else if (this.state === 'select') { this.updateSelect(); }
+                else if (this.state === 'playing') { this.updatePlay(); }
+                else if (this.state === 'paused') {
+                    if (Input.pausePressed() || Input.kp.Escape) { this.state = 'playing'; SFX.select(); }
+                    if (Input.kp.KeyR || Input.gpbp[2]) { this.startLevel(this.level); }
+                    if (Input.kp.KeyQ || Input.gpbp[1]) { this.state = 'select'; SFX.select(); }
+                }
+                else if (this.state === 'complete') {
+                    this.completeTimer++;
+                    if (this.completeTimer > 90 && Input.anyPressed()) {
+                        if (this.level >= 50) this.state = 'victory';
+                        else { this.state = 'select'; SFX.select(); }
+                    }
+                }
+                else if (this.state === 'dead') { if (Input.anyPressed()) { this.startLevel(this.level); SFX.select(); } }
+                else if (this.state === 'victory') { if (Input.anyPressed()) { this.state = 'title'; this.score = 0; this.enemiesKilled = 0; SFX.select(); } }
+
+                if (this.flash > 0) this.flash--;
+                Input.postUpdate();
+            },
+
+            updateSelect() {
+                const cols = 10;
+                let maxUnlock = Math.min(50, this.saveData.hu);
+                if (Input.kp.ArrowLeft || Input.gpbp[14] || Input.kp.KeyA) { this.selectCursor--; SFX.select(); }
+                if (Input.kp.ArrowRight || Input.gpbp[15] || Input.kp.KeyD) { this.selectCursor++; SFX.select(); }
+                if (Input.kp.ArrowUp || Input.gpbp[12] || Input.kp.KeyW) { this.selectCursor -= cols; SFX.select(); }
+                if (Input.kp.ArrowDown || Input.gpbp[13] || Input.kp.KeyS) { this.selectCursor += cols; SFX.select(); }
+                this.selectCursor = Math.max(0, Math.min(maxUnlock - 1, this.selectCursor));
+                if (Input.confirmPressed()) { SFX.select(); this.score = this.saveData.sc || 0; this.startLevel(this.selectCursor + 1); }
+                if (Input.kp.Escape || Input.gpbp[9]) { this.state = 'title'; SFX.select(); }
+            },
+
+            updatePlay() {
+                if (Input.pausePressed() || Input.kp.Escape) { this.state = 'paused'; SFX.select(); return; }
+                this.levelTime++; this.totalTime++;
+                this.player.update(this.levelData);
+                for (const e of this.enemies) e.update(this.levelData, this.player);
+                this.enemies = this.enemies.filter(e => !e.dead);
+                if (this.boss) this.boss.update(this.levelData, this.player);
+                if (this.bossDefeated && this.boss && this.boss.dead) {
+                    if (!this._bossCompleteTimer) this._bossCompleteTimer = 60;
+                    else { this._bossCompleteTimer--; if (this._bossCompleteTimer <= 0) { this._bossCompleteTimer = null; this.levelComplete(); } }
+                }
+
+                for (const g of this.grenades) {
+                    g.vy += 0.4;
+                    g.x += g.vx; g.y += g.vy;
+                    g.timer--;
+
+                    const tx = Math.floor(g.x / TILE), ty = Math.floor(g.y / TILE);
+                    if (isSolid(tileAt(this.levelData, tx, ty))) {
+                        g.y = ty * TILE - 4; g.vy *= -0.4; g.vx *= 0.6;
+                    }
+
+                    let exploded = false;
+                    if (g.timer <= 0) exploded = true;
+
+                    for (const e of this.enemies) {
+                        if (!e.dead && g.x > e.x && g.x < e.x + e.w && g.y > e.y && g.y < e.y + e.h) {
+                            exploded = true; break;
+                        }
+                    }
+
+                    if (exploded) {
+                        g.life = 0;
+                        this.hitStop = 4; this.shake = 12; SFX.explosion();
+                        for (let i = 0; i < 30; i++) this.particles.push({ x: g.x, y: g.y, vx: (Math.random() - .5) * 12, vy: (Math.random() - .5) * 12, life: 25, color: i % 2 ? '#ffaa44' : '#ff4422', size: 5 });
+                        for (const e of this.enemies) {
+                            if (!e.dead) {
+                                const dx = (e.x + e.w / 2) - g.x, dy = (e.y + e.h / 2) - g.y;
+                                const dist = Math.hypot(dx, dy);
+                                if (dist < 80) {
+                                    const dir = dx > 0 ? 1 : -1;
+                                    e.takeDamage(40, dir, true);
+                                }
+                            }
+                        }
+                        if (this.boss && !this.boss.dead) {
+                            const dx = (this.boss.x + this.boss.w / 2) - g.x, dy = (this.boss.y + this.boss.h / 2) - g.y;
+                            const dist = Math.hypot(dx, dy);
+                            if (dist < 100) this.boss.takeDamage(40);
+                        }
+                    }
+                }
+                this.grenades = this.grenades.filter(g => g.life > 0);
+
+                for (const b of this.bullets) {
+                    b.x += b.vx; b.y += b.vy; b.life--;
+                    const tx = Math.floor(b.x / TILE), ty = Math.floor(b.y / TILE);
+                    if (isSolid(tileAt(this.levelData, tx, ty))) { b.life = 0; for (let i = 0; i < 4; i++) this.particles.push({ x: b.x, y: b.y, vx: (Math.random() - .5) * 4, vy: (Math.random() - .5) * 4, life: 15, color: '#aa8844', size: 2 }); continue; }
+                    if (b.fromPlayer) {
+                        for (const e of this.enemies) {
+                            if (!e.dead && b.x > e.x && b.x < e.x + e.w && b.y > e.y && b.y < e.y + e.h) {
+                                e.takeDamage(b.dmg, Math.sign(b.vx) || 1); b.life = 0;
+                                for (let i = 0; i < 5; i++) this.particles.push({ x: b.x, y: b.y, vx: (Math.random() - .5) * 5, vy: (Math.random() - .5) * 5, life: 15, color: '#ffaa44', size: 2 });
+                                break;
+                            }
+                        }
+                        if (this.boss && !this.boss.dead && b.x > this.boss.x && b.x < this.boss.x + this.boss.w && b.y > this.boss.y && b.y < this.boss.y + this.boss.h) {
+                            this.boss.takeDamage(b.dmg); b.life = 0;
+                            for (let i = 0; i < 5; i++) this.particles.push({ x: b.x, y: b.y, vx: (Math.random() - .5) * 5, vy: (Math.random() - .5) * 5, life: 15, color: '#ffaa44', size: 2 });
+                        }
+                    } else {
+                        if (b.x > this.player.x && b.x < this.player.x + this.player.w && b.y > this.player.y && b.y < this.player.y + this.player.h) {
+                            this.player.takeDamage(b.dmg, Math.sign(b.vx) || 1); b.life = 0;
+                        }
+                    }
+                }
+                this.bullets = this.bullets.filter(b => b.life > 0);
+                for (const p of this.particles) { p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; }
+                this.particles = this.particles.filter(p => p.life > 0);
+                const targetX = this.player.x - W / 3, targetY = this.player.y - H / 2;
+                this.cam.x += (targetX - this.cam.x) * 0.1; this.cam.y += (targetY - this.cam.y) * 0.08;
+                this.cam.x = Math.max(0, Math.min(this.levelData.width * TILE - W, this.cam.x));
+                this.cam.y = Math.max(0, Math.min(this.levelData.height * TILE - H, this.cam.y));
+                if (this.shake > 0) this.shake--;
+            },
+
+            render() {
+                ctx.clearRect(0, 0, W, H);
+                if (this.state === 'title') this.drawTitle();
+                else if (this.state === 'select') this.drawSelect();
+                else if (this.state === 'playing' || this.state === 'paused') this.drawPlay();
+                else if (this.state === 'complete') { this.drawPlay(); this.drawComplete(); }
+                else if (this.state === 'dead') { this.drawPlay(); this.drawDead(); }
+                else if (this.state === 'victory') this.drawVictory();
+            },
+
+            drawTitle() {
+                const t = this.titleAnim;
+                const grad = ctx.createLinearGradient(0, 0, 0, H);
+                grad.addColorStop(0, '#0a0a2a'); grad.addColorStop(.5, '#1a0a3a'); grad.addColorStop(1, '#0a0518');
+                ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+                for (let i = 0; i < 50; i++) {
+                    const x = (i * 37 + t * .3) % W, y = (i * 23) % (H - 100) + 50;
+                    ctx.fillStyle = `rgba(150,200,255,${.3 + Math.sin(t * .02 + i) * .3})`; ctx.fillRect(x, y, 2, 2);
+                }
+                ctx.textAlign = 'center';
+                ctx.font = '40px "Press Start 2P"';
+                ctx.fillStyle = '#1a3a8a'; ctx.fillText('MEGA BLASTER', W / 2 + 3, 140 + 3);
+                ctx.fillStyle = '#4a9aff'; ctx.fillText('MEGA BLASTER', W / 2, 140);
+                ctx.fillStyle = '#ff4488'; ctx.fillText('X', W / 2 + 200 + Math.sin(t * .05) * 5, 140);
+                ctx.font = '14px "Press Start 2P"'; ctx.fillStyle = '#88aaff'; ctx.fillText('50 STAGE PLATFORMER', W / 2, 190);
+                if (Math.floor(t / 30) % 2 === 0) { ctx.font = '12px "Press Start 2P"'; ctx.fillStyle = '#ffee44'; ctx.fillText('PRESS START', W / 2, 300); }
+                ctx.font = '8px "Press Start 2P"'; ctx.fillStyle = '#6688aa'; ctx.textAlign = 'left';
+                ctx.fillText('KEYBOARD', 80, 320);
+                ctx.fillText('ARROWS: MOVE', 80, 340);
+                ctx.fillText('X: SHOOT  Z: SWORD', 80, 355);
+                ctx.fillText('SPACE: JUMP (x2=DBL)', 80, 370);
+                ctx.fillText('S: SLIDE  Q: STIM', 80, 385);
+                ctx.fillText('E: GRAPPLE  G: GRENADE', 80, 400);
+                ctx.fillText('DBL-TAP+HOLD: DASH', 80, 415);
+                ctx.fillText('WALL JUMP: JUMP+DIR', 80, 430);
+                ctx.fillText('SHIFT: GUARD  V: INVINCIBLE', 80, 445);
+                ctx.fillText('AIR+DOWN: SONIC STOMP/SHOOT', 80, 460);
+                ctx.textAlign = 'right';
+                ctx.fillText('DUALSENSE', W - 80, 320);
+                ctx.fillText('L-STICK/D-PAD: MOVE', W - 80, 340);
+                ctx.fillText('R2: SHOOT  SQUARE: SWORD', W - 80, 355);
+                ctx.fillText('CROSS: JUMP (x2=DBL)', W - 80, 370);
+                ctx.fillText('CIRCLE: SLIDE  TRIANGLE: STIM', W - 80, 385);
+                ctx.fillText('L1: GRAPPLE  L2: GRENADE', W - 80, 400);
+                ctx.fillText('DBL-TAP+HOLD: DASH', W - 80, 415);
+                ctx.fillText('WALL JUMP: CROSS+DIR', W - 80, 430);
+                ctx.fillText('R1: GUARD  L3: INVINCIBLE', W - 80, 445);
+                ctx.fillText('AIR+D-PAD DOWN: STOMP/SHT', W - 80, 460);
+                ctx.textAlign = 'center'; ctx.fillText('© 2025 MEGA BLASTER X', W / 2, 525);
+            },
+
+            drawSelect() {
+                const th = THEMES[0];
+                ctx.fillStyle = th.bg2; ctx.fillRect(0, 0, W, H);
+                ctx.strokeStyle = 'rgba(80,60,120,.1)';
+                for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+                for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+                ctx.textAlign = 'center'; ctx.font = '20px "Press Start 2P"';
+                ctx.fillStyle = '#4a9aff'; ctx.fillText('STAGE SELECT', W / 2, 40);
+                ctx.font = '8px "Press Start 2P"'; ctx.fillStyle = '#88aaff';
+                ctx.fillText(`SCORE: ${this.saveData.sc || 0}  CLEARED: ${this.saveData.cmp.length}/50`, W / 2, 60);
+                const gx = 80, gy = 90, cw = 72, ch = 72, gap = 8;
+                for (let i = 0; i < 50; i++) {
+                    const col = i % 10, row = Math.floor(i / 10);
+                    const x = gx + col * (cw + gap), y = gy + row * (ch + gap);
+                    const unlocked = i < this.saveData.hu, completed = this.saveData.cmp.includes(i + 1);
+                    const isBoss = (i + 1) % 5 === 0, ti = i % 8, theme = THEMES[ti];
+                    const isCursor = i === this.selectCursor;
+                    if (!unlocked) {
+                        ctx.fillStyle = '#1a1a22'; ctx.fillRect(x, y, cw, ch);
+                        ctx.fillStyle = '#333338'; ctx.fillRect(x + 2, y + 2, cw - 4, ch - 4);
+                        ctx.fillStyle = '#555560'; ctx.font = '12px "Press Start 2P"'; ctx.fillText('—', x + cw / 2, y + ch / 2 + 4);
+                    } else {
+                        ctx.fillStyle = theme.bg; ctx.fillRect(x, y, cw, ch);
+                        ctx.fillStyle = isBoss ? theme.dg : theme.tl; ctx.fillRect(x + 2, y + 2, cw - 4, ch - 4);
+                        if (isCursor) { ctx.strokeStyle = '#ffee44'; ctx.lineWidth = 3; ctx.strokeRect(x - 2, y - 2, cw + 4, ch + 4); }
+                        if (completed) { ctx.fillStyle = '#44ff44'; ctx.font = '10px "Press Start 2P"'; ctx.fillText('✓', x + cw - 12, y + 14); }
+                        ctx.fillStyle = isBoss ? '#ffffff' : theme.gl;
+                        ctx.font = isBoss ? '10px "Press Start 2P"' : '14px "Press Start 2P"';
+                        ctx.fillText(isBoss ? 'B' : (i + 1), x + cw / 2, y + ch / 2 + 4);
+                    }
+                }
+                const sel = this.selectCursor + 1, ti = (sel - 1) % 8, theme = THEMES[ti], isBoss = sel % 5 === 0;
+                ctx.fillStyle = theme.bg; ctx.fillRect(0, H - 80, W, 80);
+                ctx.fillStyle = '#ffffff'; ctx.font = '12px "Press Start 2P"'; ctx.textAlign = 'center';
+                ctx.fillText(`STAGE ${sel}${isBoss ? ' (BOSS)' : ''}`, W / 2, H - 55);
+                ctx.fillStyle = theme.ac; ctx.font = '10px "Press Start 2P"';
+                ctx.fillText(theme.n, W / 2, H - 38);
+                if (isBoss) { ctx.fillStyle = theme.dg; ctx.fillText(`BOSS: ${BOSS_NAMES[Math.ceil(sel / 5)]}`, W / 2, H - 22); }
+                else { ctx.fillStyle = '#8899bb'; ctx.fillText('PRESS ENTER/CROSS TO START', W / 2, H - 22); }
+            },
+
+            drawPlay() {
+                const level = this.levelData, th = level.theme;
+                let sx = 0, sy = 0;
+                if (this.shake > 0) { sx = (Math.random() - .5) * this.shake; sy = (Math.random() - .5) * this.shake; }
+                ctx.save(); ctx.translate(sx, sy);
+                const grad = ctx.createLinearGradient(0, 0, 0, H);
+                grad.addColorStop(0, th.bg); grad.addColorStop(.6, th.bg2); grad.addColorStop(1, th.bg);
+                ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+                const px1 = -this.cam.x * .1, px2 = -this.cam.x * .3;
+                ctx.fillStyle = th.fg;
+                for (let i = 0; i < 20; i++) { const bx = (i * 120 + px1) % (W + 200) - 100; const bh = 80 + ((i * 37) % 120); ctx.globalAlpha = .3; ctx.fillRect(bx, H - bh - 40, 80, bh); }
+                ctx.globalAlpha = .5;
+                for (let i = 0; i < 15; i++) { const bx = (i * 150 + px2) % (W + 200) - 100; const bh = 60 + ((i * 53) % 100); ctx.fillRect(bx, H - bh - 20, 100, bh); }
+                ctx.globalAlpha = 1;
+                const startX = Math.floor(this.cam.x / TILE) - 1, endX = Math.ceil((this.cam.x + W) / TILE) + 1;
+                const startY = Math.max(0, Math.floor(this.cam.y / TILE) - 1), endY = Math.min(level.height, Math.ceil((this.cam.y + H) / TILE) + 1);
+                for (let ty = startY; ty < endY; ty++) {
+                    for (let tx = startX; tx < endX; tx++) {
+                        const t = tileAt(level, tx, ty);
+                        if (t === 0) continue;
+                        const dx = tx * TILE - this.cam.x, dy = ty * TILE - this.cam.y;
+                        if (t === 1) {
+                            ctx.fillStyle = th.tl2; ctx.fillRect(dx, dy, TILE, TILE);
+                            ctx.fillStyle = th.tl; ctx.fillRect(dx + 1, dy + 1, TILE - 2, TILE - 2);
+                            ctx.fillStyle = th.tl2; ctx.fillRect(dx, dy + TILE - 4, TILE, 4);
+                            if (tileAt(level, tx, ty - 1) !== 1) { ctx.fillStyle = th.ac; ctx.globalAlpha = .3; ctx.fillRect(dx, dy, TILE, 3); ctx.globalAlpha = 1; }
+                        } else if (t === 2) {
+                            ctx.fillStyle = th.tl; ctx.fillRect(dx, dy, TILE, 8);
+                            ctx.fillStyle = th.tl2; ctx.fillRect(dx, dy + 8, TILE, 2);
+                            ctx.fillStyle = th.ac; ctx.globalAlpha = .5; ctx.fillRect(dx, dy, TILE, 2); ctx.globalAlpha = 1;
+                        } else if (t === 3) {
+                            ctx.fillStyle = th.dg;
+                            for (let s = 0; s < 4; s++) { ctx.beginPath(); ctx.moveTo(dx + s * 8, dy + TILE); ctx.lineTo(dx + s * 8 + 4, dy + 8); ctx.lineTo(dx + s * 8 + 8, dy + TILE); ctx.closePath(); ctx.fill(); }
+                            ctx.fillStyle = '#ffffff'; ctx.globalAlpha = .3;
+                            for (let s = 0; s < 4; s++) { ctx.beginPath(); ctx.moveTo(dx + s * 8 + 2, dy + TILE - 4); ctx.lineTo(dx + s * 8 + 4, dy + 12); ctx.lineTo(dx + s * 8 + 6, dy + TILE - 4); ctx.closePath(); ctx.fill(); }
+                            ctx.globalAlpha = 1;
+                        } else if (t === 4) {
+                            const pulse = Math.sin(this.titleAnim * .1) * .3 + .7;
+                            ctx.fillStyle = th.ac; ctx.globalAlpha = pulse; ctx.fillRect(dx + 4, dy - 20, TILE - 8, TILE + 20);
+                            ctx.fillStyle = th.gl; ctx.globalAlpha = pulse * .5; ctx.fillRect(dx - 4, dy - 24, TILE + 8, TILE + 24);
+                            ctx.globalAlpha = 1; ctx.fillStyle = '#ffffff'; ctx.font = '8px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.fillText('GOAL', dx + TILE / 2, dy - 4);
+                        }
+                    }
+                }
+                for (const p of this.particles) { ctx.fillStyle = p.color; ctx.globalAlpha = p.life / 30; ctx.fillRect(p.x - this.cam.x - p.size / 2, p.y - this.cam.y - p.size / 2, p.size, p.size); }
+                ctx.globalAlpha = 1;
+
+                for (const g of this.grenades) {
+                    ctx.fillStyle = '#44aa44';
+                    ctx.fillRect(g.x - this.cam.x - 3, g.y - this.cam.y - 3, 6, 6);
+                    ctx.fillStyle = '#88ff88';
+                    ctx.fillRect(g.x - this.cam.x - 2, g.y - this.cam.y - 2, 2, 2);
+                }
+
+                for (const b of this.bullets) {
+                    if (b.fromPlayer) {
+                        if (b.vy > 0 && b.vx === 0) {
+                            ctx.fillStyle = '#88ddff'; ctx.fillRect(b.x - this.cam.x - 2, b.y - this.cam.y, 4, 8);
+                            ctx.fillStyle = '#ffffff'; ctx.fillRect(b.x - this.cam.x - 1, b.y - this.cam.y, 2, 4);
+                        } else {
+                            ctx.fillStyle = '#88ddff'; ctx.fillRect(b.x - this.cam.x - 3, b.y - this.cam.y - 2, 8, 4);
+                            ctx.fillStyle = '#ffffff'; ctx.fillRect(b.x - this.cam.x - 1, b.y - this.cam.y - 1, 4, 2);
+                        }
+                    } else {
+                        ctx.fillStyle = '#ff6644'; ctx.fillRect(b.x - this.cam.x - 3, b.y - this.cam.y - 3, 6, 6);
+                        ctx.fillStyle = '#ffaa44'; ctx.fillRect(b.x - this.cam.x - 2, b.y - this.cam.y - 2, 4, 4);
+                    }
+                }
+
+                for (const e of this.enemies) e.draw(ctx, this.cam);
+                if (this.boss) this.boss.draw(ctx, this.cam);
+                this.player.draw(ctx, this.cam);
+                ctx.restore();
+                this.drawHUD();
+
+                if (this.flash > 0) {
+                    ctx.fillStyle = `rgba(255, 215, 0, ${this.flash / 20})`;
+                    ctx.fillRect(0, 0, W, H);
+                }
+
+                if (this.state === 'paused') {
+                    ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(0, 0, W, H);
+                    ctx.fillStyle = '#ffffff'; ctx.font = '28px "Press Start 2P"'; ctx.textAlign = 'center';
+                    ctx.fillText('PAUSED', W / 2, H / 2 - 40);
+                    ctx.font = '10px "Press Start 2P"'; ctx.fillStyle = '#88aaff';
+                    ctx.fillText('ESC/OPTIONS: RESUME', W / 2, H / 2 + 10);
+                    ctx.fillText('R/SQUARE: RESTART', W / 2, H / 2 + 35);
+                    ctx.fillText('Q/CIRCLE: STAGE SELECT', W / 2, H / 2 + 60);
+                }
+            },
+
+            drawHUD() {
+                const th = this.levelData.theme;
+                ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(10, 10, 220, 24);
+                ctx.fillStyle = '#220000'; ctx.fillRect(14, 14, 200, 16);
+                const hpPct = this.player.hp / this.player.maxHp;
+                const hpCol = hpPct > .5 ? '#44dd44' : hpPct > .25 ? '#ddaa44' : '#dd4444';
+                ctx.fillStyle = hpCol; ctx.fillRect(14, 14, 200 * hpPct, 16);
+                if (this.player.regenActive) {
+                    ctx.strokeStyle = '#44ff44'; ctx.lineWidth = 2; ctx.globalAlpha = .5 + Math.sin(this.titleAnim * .1) * .3;
+                    ctx.strokeRect(14, 14, 200, 16); ctx.globalAlpha = 1;
+                }
+                ctx.fillStyle = '#ffffff'; ctx.font = '8px "Press Start 2P"'; ctx.textAlign = 'left';
+                ctx.fillText('HP', 16, 18); ctx.textAlign = 'right'; ctx.fillText(`${Math.ceil(this.player.hp)}/${this.player.maxHp}`, 210, 18);
+
+                const gx = 14, gy = 40;
+                ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(gx - 2, gy - 2, 204, 14);
+                const bw = 66;
+                ctx.fillStyle = '#330000'; ctx.fillRect(gx, gy, bw, 10);
+                ctx.fillStyle = '#ff4444'; ctx.fillRect(gx, gy, bw * Math.max(0, Math.min(1, this.player.guard / 33)), 10);
+                ctx.fillStyle = '#333300'; ctx.fillRect(gx + bw, gy, bw, 10);
+                ctx.fillStyle = '#ffee44'; ctx.fillRect(gx + bw, gy, bw * Math.max(0, Math.min(1, (this.player.guard - 33) / 33)), 10);
+                ctx.fillStyle = '#003300'; ctx.fillRect(gx + bw * 2, gy, bw, 10);
+                ctx.fillStyle = '#44ff44'; ctx.fillRect(gx + bw * 2, gy, bw * Math.max(0, Math.min(1, (this.player.guard - 66) / 34)), 10);
+
+                const ix = 14, iy = 54;
+                ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(ix - 2, iy - 2, 204, 14);
+                ctx.fillStyle = '#222'; ctx.fillRect(ix, iy, 200, 10);
+                if (this.player.invCharge > 0) {
+                    ctx.fillStyle = this.player.invCharge >= 100 ? '#44ddff' : '#6688ff';
+                    ctx.fillRect(ix, iy, 200 * (this.player.invCharge / 100), 10);
+                }
+                if (this.player.invCharge >= 100 && Math.floor(this.titleAnim / 10) % 2 === 0) {
+                    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.strokeRect(ix - 1, iy - 1, 202, 12);
+                }
+                ctx.fillStyle = '#fff'; ctx.font = '6px "Press Start 2P"'; ctx.textAlign = 'left';
+                ctx.fillText('INV (L3)', ix + 2, iy + 7);
+                if (this.player.invModeActive) {
+                    ctx.fillStyle = `rgba(255, 215, 0, ${0.5 + Math.sin(this.titleAnim * .2) * 0.3})`;
+                    ctx.fillRect(ix, iy, 200 * (this.player.invMode / 300), 10);
+                }
+
+                ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(10, 70, 120, 20);
+                ctx.fillStyle = '#44ff44'; ctx.font = '8px "Press Start 2P"'; ctx.fillText('STM', 14, 84);
+                for (let i = 0; i < 3; i++) { ctx.fillStyle = i < this.player.stims ? '#44ff44' : '#224422'; ctx.fillRect(40 + i * 12, 74, 8, 12); }
+
+                ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(10, 90, 120, 20);
+                ctx.fillStyle = '#ff8844'; ctx.font = '8px "Press Start 2P"'; ctx.fillText('GRN', 14, 104);
+                for (let i = 0; i < 3; i++) { ctx.fillStyle = i < this.player.grenades ? '#ff8844' : '#442211'; ctx.fillRect(40 + i * 12, 94, 8, 12); }
+
+                if (this.player.combo > 1) {
+                    ctx.textAlign = 'center';
+                    ctx.font = '16px "Press Start 2P"';
+                    ctx.fillStyle = `hsl(${Math.max(0, 60 - this.player.combo * 2)}, 100%, 60%)`;
+                    ctx.fillText(`x${this.player.combo} COMBO`, W / 2, 45);
+                    ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.fillRect(W / 2 - 50, 50, 100, 4);
+                    ctx.fillStyle = '#ffee44'; ctx.fillRect(W / 2 - 50, 50, 100 * (this.player.comboTimer / 120), 4);
+                }
+
+                ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(W / 2 - 110, 10, 220, 20);
+                ctx.fillStyle = th.ac; ctx.font = '10px "Press Start 2P"'; ctx.fillText(`STAGE ${this.level} - ${th.n}`, W / 2, 24);
+                ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(W - 130, 10, 120, 20);
+                ctx.fillStyle = '#ffee44'; ctx.font = '8px "Press Start 2P"'; ctx.fillText(`SCORE ${this.score}`, W - 14, 24);
+                if (this.boss && !this.boss.dead) {
+                    ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(W / 2 - 200, H - 50, 400, 40);
+                    ctx.fillStyle = '#330000'; ctx.fillRect(W / 2 - 190, H - 42, 380, 16);
+                    ctx.fillStyle = '#ff4444'; ctx.fillRect(W / 2 - 190, H - 42, 380 * (this.boss.hp / this.boss.maxhp), 16);
+                    ctx.fillStyle = '#ffffff'; ctx.font = '10px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.fillText(this.boss.name, W / 2, H - 46);
+                }
+            },
+
+            drawComplete() {
+                ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(0, 0, W, H);
+                ctx.textAlign = 'center'; ctx.fillStyle = '#44ff44'; ctx.font = '28px "Press Start 2P"';
+                ctx.fillText('STAGE CLEAR!', W / 2, H / 2 - 40);
+                ctx.fillStyle = '#88aaff'; ctx.font = '10px "Press Start 2P"';
+                ctx.fillText(`TIME: ${Math.floor(this.levelTime / 60)}s`, W / 2, H / 2);
+                ctx.fillText(`SCORE: ${this.score}`, W / 2, H / 2 + 25);
+                ctx.fillText(`ENEMIES DEFEATED: ${this.enemiesKilled}`, W / 2, H / 2 + 50);
+                if (this.completeTimer > 90 && Math.floor(this.titleAnim / 30) % 2 === 0) { ctx.fillStyle = '#ffee44'; ctx.fillText('PRESS ANY KEY', W / 2, H / 2 + 90); }
+            },
+
+            drawDead() {
+                ctx.fillStyle = 'rgba(20,0,0,.7)'; ctx.fillRect(0, 0, W, H);
+                ctx.textAlign = 'center'; ctx.fillStyle = '#ff4444'; ctx.font = '28px "Press Start 2P"';
+                ctx.fillText('GAME OVER', W / 2, H / 2 - 20);
+                if (Math.floor(this.titleAnim / 30) % 2 === 0) { ctx.fillStyle = '#ffee44'; ctx.font = '10px "Press Start 2P"'; ctx.fillText('PRESS ANY KEY TO RETRY', W / 2, H / 2 + 30); }
+            },
+
+            drawVictory() {
+                const t = this.titleAnim;
+                const grad = ctx.createLinearGradient(0, 0, 0, H);
+                grad.addColorStop(0, '#0a0a3a'); grad.addColorStop(1, '#1a0a2a');
+                ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+                for (let i = 0; i < 30; i++) {
+                    const x = (i * 47 + t) % W, y = (i * 31 + t * .5) % (H / 2);
+                    ctx.fillStyle = `hsl(${(i * 37 + t) % 360},80%,60%)`; ctx.globalAlpha = .6; ctx.fillRect(x, y, 3, 3);
+                }
+                ctx.globalAlpha = 1; ctx.textAlign = 'center';
+                ctx.fillStyle = '#ffdd44'; ctx.font = '28px "Press Start 2P"'; ctx.fillText('CONGRATULATIONS!', W / 2, 140);
+                ctx.fillStyle = '#88aaff'; ctx.font = '12px "Press Start 2P"'; ctx.fillText('ALL 50 STAGES CLEARED', W / 2, 180);
+                ctx.fillStyle = '#6688cc'; ctx.font = '10px "Press Start 2P"';
+                ctx.fillText(`FINAL SCORE: ${this.score}`, W / 2, 240);
+                ctx.fillText(`ENEMIES DEFEATED: ${this.enemiesKilled}`, W / 2, 270);
+                ctx.fillText(`TOTAL TIME: ${Math.floor(this.totalTime / 60)}s`, W / 2, 300);
+                if (Math.floor(t / 30) % 2 === 0) { ctx.fillStyle = '#ffee44'; ctx.fillText('PRESS ANY KEY', W / 2, 380); }
+            },
+
+            loop() { this.update(); this.render(); requestAnimationFrame(() => this.loop()); }
+        };
+
+        game.start();
+    </script>
+</body>
+</html>

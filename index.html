@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEGA BLASTER X - The Ultimate 50-Stage Platformer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-blue: #4a9aff;
+            --neon-pink: #ff4488;
+            --neon-yellow: #ffee44;
+            --neon-green: #44ff44;
+            --bg-dark: #050510;
+            --bg-panel: #11111f;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image: linear-gradient(rgba(74, 154, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(74, 154, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            color: #ffffff;
+            font-family: 'Orbitron', sans-serif;
+            overflow-x: hidden;
+            text-align: center;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            position: relative;
+        }
+
+            .hero::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: radial-gradient(circle at center, rgba(74, 154, 255, 0.15) 0%, transparent 60%);
+                z-index: -1;
+            }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--neon-yellow);
+            letter-spacing: 4px;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(255, 238, 68, 0.7);
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: clamp(2rem, 8vw, 5.5rem);
+            line-height: 1.2;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(180deg, #fff, var(--neon-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(74, 154, 255, 0.5);
+            animation: flicker 4s infinite alternate;
+        }
+
+            h1 span {
+                color: var(--neon-pink);
+                -webkit-text-fill-color: var(--neon-pink);
+                text-shadow: 0 0 20px rgba(255, 68, 136, 0.8);
+            }
+
+        .tagline {
+            font-size: clamp(1rem, 3vw, 1.5rem);
+            color: #aadcff;
+            margin-bottom: 3rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+
+        /* Play Button */
+        .btn-play {
+            display: inline-block;
+            padding: 1.5rem 4rem;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1.5rem;
+            color: #fff;
+            background: linear-gradient(45deg, var(--neon-blue), var(--neon-pink));
+            text-decoration: none;
+            border: 3px solid #fff;
+            border-radius: 8px;
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(74, 154, 255, 0.6), 0 0 40px rgba(255, 68, 136, 0.4);
+        }
+
+            .btn-play:hover {
+                transform: scale(1.05) translateY(-3px);
+                box-shadow: 0 0 30px rgba(74, 154, 255, 0.9), 0 0 60px rgba(255, 68, 136, 0.7);
+                letter-spacing: 2px;
+            }
+
+            .btn-play:active {
+                transform: scale(0.98);
+            }
+
+        /* Image / Screenshot Area */
+        .screenshot-container {
+            max-width: 900px;
+            margin: 4rem auto;
+            padding: 1rem;
+            border: 2px solid var(--neon-blue);
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(74, 154, 255, 0.3);
+            background: rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .screenshot-placeholder {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+            .screenshot-placeholder img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                opacity: 0.8;
+            }
+
+        .scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        /* Content Section */
+        .content-section {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        .headline {
+            font-size: clamp(1.8rem, 5vw, 3rem);
+            font-weight: 900;
+            color: var(--neon-blue);
+            margin-bottom: 1.5rem;
+            text-transform: uppercase;
+            text-shadow: 0 0 15px rgba(74, 154, 255, 0.5);
+        }
+
+        .description {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            color: #ccc;
+            margin-bottom: 4rem;
+            font-weight: 400;
+        }
+
+        /* Features Grid */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .feature-card {
+            background: var(--bg-panel);
+            border: 1px solid #333;
+            padding: 2rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+
+            .feature-card:hover {
+                border-color: var(--neon-pink);
+                transform: translateY(-5px);
+                box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .feature-title {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            color: var(--neon-yellow);
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+
+        .feature-desc {
+            font-size: 0.9rem;
+            color: #aaa;
+            line-height: 1.6;
+        }
+
+        /* Footer CTA */
+        .footer-cta {
+            padding: 6rem 2rem;
+            background: linear-gradient(180deg, transparent, rgba(255, 68, 136, 0.1));
+            margin-top: 4rem;
+        }
+
+        footer {
+            margin-top: 3rem;
+            padding: 2rem;
+            color: #555;
+            font-size: 0.8rem;
+            border-top: 1px solid #222;
+        }
+
+        /* Animations */
+        @keyframes flicker {
+            0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+                opacity: 1;
+                text-shadow: 0 0 30px rgba(74, 154, 255, 0.5);
+            }
+
+            20%, 24%, 55% {
+                opacity: 0.8;
+                text-shadow: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .btn-play {
+                padding: 1.2rem 2.5rem;
+                font-size: 1.2rem;
+            }
+
+            .screenshot-container {
+                margin: 2rem auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Hero Section -->
+    <header class="hero">
+        <p class="subtitle">The Ultimate Cybernetic Blaster</p>
+        <h1>MEGA BLASTER <span>X</span></h1>
+        <p class="tagline">50 Stages. 8 Themes. 1 Epic Cybernetic War.</p>
+        <a href="game.html" class="btn-play">▶ PLAY NOW</a>
+    </header>
+
+    <!-- Screenshot Section -->
+    <div class="screenshot-container">
+        <div class="screenshot-placeholder">
+            <!-- You can replace this with an actual <img src="screenshot.png"> tag later -->
+            <div style="font-family: 'Press Start 2P'; color: var(--neon-blue); font-size: 1.5rem;">[ GAME SCREENSHOT ]</div>
+            <div class="scanline"></div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="content-section">
+        <h2 class="headline">Unleash the Ultimate Cybernetic Blaster.</h2>
+        <p class="description">
+            Dive into a retro-futuristic world filled with intense platforming, relentless bosses, and explosive combat. Master wall jumps, chain sonic stomps, and wield an arsenal of high-tech weapons to conquer 50 uniquely challenging stages. Whether you're dodging spikes in the Ice Laboratory or taking down the Gridlord, MEGA BLASTER X is fast, it's furious, and it's endlessly fun.
+        </p>
+
+        <!-- Features Grid -->
+        <div class="features">
+            <div class="feature-card">
+                <span class="feature-icon">🌍</span>
+                <h3 class="feature-title">50 Unique Stages</h3>
+                <p class="feature-desc">Battle through 8 distinct themes, from the Industrial Zone to the Cyber Grid. Every 5th stage features a massive, multi-phase boss fight.</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">⚔️</span>
+                <h3 class="feature-title">Deep Combat System</h3>
+                <p class="feature-desc">Shoot, slash, stomp, and dash. Build combos, charge your invincibility gauge, and unleash devastating grenade attacks.</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🏃</span>
+                <h3 class="feature-title">Fluid Movement</h3>
+                <p class="feature-desc">Sustained dashing, wall-jumping shafts, grapple hooks, and Sonic-style stomps give you complete control over the battlefield.</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🎮</span>
+                <h3 class="feature-title">Full Controller Support</h3>
+                <p class="feature-desc">Play seamlessly with your DualSense controller or touch controls on mobile. Built for precision platforming.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer CTA -->
+    <section class="footer-cta">
+        <h2 class="headline">Ready to Blast Off?</h2>
+        <a href="game.html" class="btn-play">▶ START GAME</a>
+    </section>
+
+    <footer>
+        <p>&copy; 2025 MEGA BLASTER X. All Rights Reserved.</p>
+    </footer>
+
+</body>
+</html>
