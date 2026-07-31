@@ -318,10 +318,8 @@
             { n: 'CYBER', bg: '#1a0a2a', bg2: '#0d0518', tl: '#6a3a8a', tl2: '#4a2a5a', ac: '#ff44dd', gl: '#aa77ff', dg: '#ff3366', fg: '#2a1a3a', mel: [220, 261.63, 311.13, 349.23, 415.30, 466.16], bass: [110, 130.81, 164.81], bpm: 145 }
         ];
         const BOSS_NAMES = ['', 'COGMASTER', 'FROSTBITE', 'INFERNO', 'VINECREEP', 'STORMWING', 'DEPTHKING', 'SANDSCORCH', 'GRIDLORD', 'OMEGA', 'MEGA EMPEROR'];
-        // Rock theme for opening cutscene
-        const ROCK = { chords: [[82.41, 123.47], [98.00, 146.83], [110.00, 164.81], [82.41, 123.47]], lead: [329.63, 392.00, 440.00, 493.88, 587.33, 659.25], bass: [82.41, 82.41, 98.00, 110.00], bpm: 165 };
         const Save = {
-            k: 'mbx_v10', slots: [null, null, null],
+            k: 'mbx_v9', slots: [null, null, null],
             load() { try { const d = localStorage.getItem(this.k); if (d) this.slots = JSON.parse(d); } catch (e) { } },
             save() { try { localStorage.setItem(this.k, JSON.stringify(this.slots)); } catch (e) { alert('Save failed! Storage full.'); } },
             newSlot(i) { this.slots[i] = { hu: 1, cmp: [], sc: 0, time: 0, name: 'SLOT ' + (i + 1), customLevels: [] }; this.save(); }
@@ -366,21 +364,6 @@
                 this.interval = setInterval(tick, noteLen * 1000);
             },
             note(freq, dur, type, vol) { if (!this.ctx) return; const o = this.ctx.createOscillator(), g = this.ctx.createGain(); o.type = type; o.frequency.value = freq; g.gain.setValueAtTime(vol, this.ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur); o.connect(g); g.connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + dur); },
-            playRock() {
-                this.init(); if (!this.ctx) return; this.stop(); this.isPlaying = true; this.step = 0;
-                const nl = 60 / ROCK.bpm / 4;
-                this.interval = setInterval(() => {
-                    if (!this.isPlaying) return;
-                    const s = this.step % 32, ci = Math.floor(this.step / 8) % 4;
-                    if (s % 8 === 0 || s % 8 === 4) { ROCK.chords[ci].forEach(f => this.note(f, nl * 4, 'sawtooth', 0.07)); }
-                    if (s % 4 === 0) this.note(ROCK.bass[ci], nl * 3, 'triangle', 0.1);
-                    if (s % 2 === 0 && Math.random() > 0.2) this.note(ROCK.lead[Math.floor(Math.random() * ROCK.lead.length)], nl * 2, 'square', 0.04);
-                    if (s % 4 === 0) AC.play(55, 0.08, 'sine', 0.15);
-                    if (s % 4 === 2) AC.noise(0.04, 0.08);
-                    if (s % 2 === 1) AC.noise(0.015, 0.02);
-                    this.step++;
-                }, nl * 1000);
-            },
             stop() { this.isPlaying = false; if (this.interval) clearInterval(this.interval); }
         };
         const Input = {
@@ -617,8 +600,10 @@
                 const wallAhead = isSolid(tileAt(l, aheadX, headY));
                 const enemyAhead = game.enemies.some(e => !e.dead && e.x > this.x && e.x < this.x + 100 && Math.abs(e.y - this.y) < 50);
                 if (this.grounded && (gapAhead || wallAhead || enemyAhead)) this.vy = -13;
-                if (wallAhead && !this.grounded && this.vy > 0) this.vy = -13;
-                moveX(this, l); moveY(this, l); this.x += this.vx;
+                if (wallAhead && !this.grounded && this.vy > 0) this.vy = -13; // Wall jump
+                moveX(this, l);
+                moveY(this, l);
+                this.x += this.vx;
                 this.shootCD--;
                 if (enemyAhead && this.shootCD <= 0) { this.shootCD = 30; game.bullets.push({ x: this.x + this.w, y: this.y + 10, vx: 12, vy: 0, dmg: 10, life: 60, fromPlayer: false, isGhostBullet: true }); }
                 const cx = Math.floor((this.x + this.w / 2) / TILE), cy = Math.floor((this.y + this.h / 2) / TILE);
@@ -635,33 +620,13 @@
             draw(c, cam) { if (this.dead) return; const x = this.x - cam.x, y = this.y - cam.y, f = this.flashTimer > 0, th = THEMES[(this.num - 1) % 6]; c.fillStyle = f ? '#fff' : th.tl; c.fillRect(x + 4, y + 16, this.w - 8, this.h - 16); c.fillStyle = f ? '#fff' : th.ac; c.fillRect(x + 8, y, this.w - 16, 18); c.fillStyle = '#ff0000'; c.fillRect(x + (this.facing > 0 ? 24 : 8), y + 6, 6, 4); c.fillRect(x + (this.facing > 0 ? 32 : 16), y + 6, 6, 4); c.fillStyle = th.dg; c.fillRect(x + this.w / 2 - 6, y + 24, 12, 12); }
         }
 
-        // ═══════════════════════════════════════════════
-        // OPENING CUTSCENE - Naruto Ultimate Ninja 4 style
-        // ═══════════════════════════════════════════════
-        const OPENING_TEXTS = [
-            { time: 3, text: '50 STAGES OF PURE CHAOS' },
-            { time: 7, text: 'BUILD YOUR OWN LEVELS' },
-            { time: 11, text: 'RACE ONLINE' },
-            { time: 15, text: 'CUSTOM MUSIC & SPRITES' }
-        ];
-
         const game = {
             state: 'save_select', level: 1, save: null, saveCursor: 0, player: null, enemies: [], bullets: [], particles: [], grenades: [], boss: null, bossDefeated: false, levelData: null, cam: { x: 0, y: 0 }, shake: 0, flash: 0, hitStop: 0, cheatMsg: 0, deadTimer: 0, sonicPhysics: false,
             score: 0, enemiesKilled: 0, totalTime: 0, levelTime: 0, titleAnim: 0, selectCursor: 0, completeTimer: 0, _bossCompleteTimer: null, menuCursor: 0,
             editorGrid: null, editorEnemies: [], editorTool: 1, editorCamX: 0, editorAssets: {}, editorMusic: null, customCursor: 0, isCustomLevel: false, editorCollision: true, editorImgTiles: {}, editorSelected: false, spriteSheetImg: null, spriteFrames: [],
             ghosts: [], raceTime: 0, raceFinished: false,
-            // Opening cutscene properties
-            openingTime: 0, openingPlayer: null, openingEnemies: [], openingParticles: [], openingCamX: 0,
 
             start() { Input.init(); this.loop(); },
-
-            startOpening() {
-                this.state = 'opening'; this.openingTime = 0;
-                this.openingPlayer = { x: 100, y: 372, vx: 6, vy: 0, facing: 1, grounded: true, swordActive: 0, animTime: 0, w: 18, h: 28 };
-                this.openingEnemies = []; this.openingParticles = []; this.openingCamX = 0;
-                Music.playRock();
-            },
-
             startLevel(num, custom = false) {
                 this.level = num; this.isCustomLevel = custom;
                 if (custom && this.save.customLevels && this.save.customLevels[num]) {
@@ -685,7 +650,6 @@
                 if (this.shake > 0) this.shake--;
                 if (this.cheatMsg > 0) this.cheatMsg--;
                 if (this.state === 'save_select') { this.updateSaveSelect(); }
-                else if (this.state === 'opening') { this.updateOpening(); }
                 else if (this.state === 'title') { if (Input.startPressed()) { SFX.select(); this.state = 'menu'; } }
                 else if (this.state === 'menu') { this.updateMenu(); }
                 else if (this.state === 'select') { this.updateSelect(); }
@@ -699,66 +663,11 @@
                 else if (this.state === 'victory') { if (Input.anyPressed()) { this.state = 'menu'; this.score = 0; this.enemiesKilled = 0; SFX.select(); } }
                 Input.postUpdate();
             },
-
-            updateOpening() {
-                this.openingTime++;
-                const t = this.openingTime;
-                const p = this.openingPlayer;
-
-                // Skip
-                if (Input.startPressed()) { Music.stop(); this.state = 'title'; return; }
-
-                // Phase 1: Logo fade (0-180 frames = 0-3s)
-                if (t < 180) return;
-
-                // Phase 2: Action (180-1200 = 3-20s)
-                if (t >= 180 && t < 1200) {
-                    p.animTime++;
-                    // Auto-run
-                    p.vx = 6; p.vy += 0.55; if (p.vy > 14) p.vy = 14;
-                    p.x += p.vx; p.y += p.vy;
-                    // Ground at y=400
-                    if (p.y > 400) { p.y = 400; p.vy = 0; p.grounded = true; } else p.grounded = false;
-                    // Auto-jump periodically
-                    if (p.grounded && t % 80 === 0) { p.vy = -13; SFX.jump(); }
-                    // Spawn enemies
-                    if (t % 35 === 0) {
-                        const types = ['gunner', 'swordsman', 'flier', 'jumper'];
-                        this.openingEnemies.push({ x: p.x + 600 + Math.random() * 200, y: 372, w: 20, h: 26, dead: false, flashTimer: 0, type: types[Math.floor(Math.random() * types.length)] });
-                    }
-                    // Auto-slash
-                    p.swordActive = Math.max(0, p.swordActive - 1);
-                    for (const e of this.openingEnemies) {
-                        if (e.dead) continue;
-                        const dx = e.x - p.x;
-                        if (Math.abs(dx) < 55 && Math.abs(e.y - p.y) < 55) {
-                            if (p.swordActive <= 0) { p.swordActive = 8; SFX.sword(); }
-                            if (p.swordActive > 0) {
-                                e.dead = true; e.flashTimer = 8; SFX.enemyDie(); this.shake = 8;
-                                for (let i = 0; i < 15; i++) this.openingParticles.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, vx: (Math.random() - .5) * 10, vy: (Math.random() - .5) * 10 - 2, life: 30, color: Math.random() < .5 ? '#ff8844' : '#ffee44', size: 4 });
-                            }
-                        }
-                    }
-                    this.openingEnemies = this.openingEnemies.filter(e => !e.dead || e.flashTimer > 0);
-                    for (const e of this.openingEnemies) if (e.flashTimer > 0) e.flashTimer--;
-                    // Particles
-                    for (const pt of this.openingParticles) { pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.3; pt.life--; }
-                    this.openingParticles = this.openingParticles.filter(pt => pt.life > 0);
-                    // Camera
-                    this.openingCamX = p.x - W / 3;
-                    if (this.shake > 0) this.shake--;
-                    return;
-                }
-
-                // Phase 3: Final logo (1200+)
-                return;
-            },
-
             updateSaveSelect() {
                 if (Input.kp.ArrowUp || Input.gpbp[12]) { this.saveCursor--; SFX.select(); }
                 if (Input.kp.ArrowDown || Input.gpbp[13]) { this.saveCursor++; SFX.select(); }
                 this.saveCursor = (this.saveCursor + 4) % 4;
-                if (Input.confirmPressed()) { SFX.select(); if (this.saveCursor < 3) { if (Save.slots[this.saveCursor]) { this.save = Save.slots[this.saveCursor]; if (!this.save.customLevels) this.save.customLevels = []; this.startOpening(); } else { Save.newSlot(this.saveCursor); this.save = Save.slots[this.saveCursor]; this.startOpening(); } } }
+                if (Input.confirmPressed()) { SFX.select(); if (this.saveCursor < 3) { if (Save.slots[this.saveCursor]) { this.save = Save.slots[this.saveCursor]; if (!this.save.customLevels) this.save.customLevels = []; this.state = 'title'; } else { Save.newSlot(this.saveCursor); this.save = Save.slots[this.saveCursor]; this.state = 'title'; } } }
             },
             updateMenu() {
                 if (Input.kp.ArrowUp || Input.gpbp[12]) { this.menuCursor--; SFX.select(); }
@@ -812,177 +721,9 @@
             exitEditor() { this.state = 'menu'; document.getElementById('editorBar').style.display = 'none'; document.getElementById('spritePreview').style.display = 'none'; if (this.editorMusic) this.editorMusic.pause(); Music.play(THEMES[0]); },
             render() {
                 ctx.clearRect(0, 0, W, H);
-                if (this.state === 'save_select') this.drawSaveSelect();
-                else if (this.state === 'opening') this.drawOpening();
-                else if (this.state === 'title') this.drawTitle();
-                else if (this.state === 'menu') this.drawMenu();
-                else if (this.state === 'select') this.drawSelect();
-                else if (this.state === 'custom_select') this.drawCustomSelect();
-                else if (this.state === 'playing' || this.state === 'paused' || this.state === 'online') this.drawPlay();
-                else if (this.state === 'editor') this.drawEditor();
-                else if (this.state === 'complete') { this.drawPlay(); this.drawComplete(); }
-                else if (this.state === 'dead') { this.drawPlay(); this.drawDead(); }
-                else if (this.state === 'victory') this.drawVictory();
+                if (this.state === 'save_select') this.drawSaveSelect(); else if (this.state === 'title') this.drawTitle(); else if (this.state === 'menu') this.drawMenu(); else if (this.state === 'select') this.drawSelect(); else if (this.state === 'custom_select') this.drawCustomSelect(); else if (this.state === 'playing' || this.state === 'paused' || this.state === 'online') this.drawPlay(); else if (this.state === 'editor') this.drawEditor(); else if (this.state === 'complete') { this.drawPlay(); this.drawComplete(); } else if (this.state === 'dead') { this.drawPlay(); this.drawDead(); } else if (this.state === 'victory') this.drawVictory();
                 if (this.cheatMsg > 0) { ctx.fillStyle = `rgba(0,255,0,${this.cheatMsg / 120})`; ctx.font = '16px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.fillText(this.sonicPhysics ? 'SONIC PHYSICS ENABLED' : 'ALL LEVELS UNLOCKED', W / 2, H / 2); }
             },
-
-            // ═══════════════════════════════════════════════
-            // OPENING CUTSCENE RENDERING
-            // ═══════════════════════════════════════════════
-            drawOpening() {
-                const t = this.openingTime;
-
-                // Phase 1: Logo fade in (0-180 frames = 0-3 seconds)
-                if (t < 180) {
-                    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-                    // Stars
-                    for (let i = 0; i < 50; i++) {
-                        const sx = (i * 37 + t * 0.3) % W, sy = (i * 23) % (H - 100) + 50;
-                        ctx.fillStyle = `rgba(150,200,255,${0.3 + Math.sin(t * 0.02 + i) * 0.3})`;
-                        ctx.fillRect(sx, sy, 2, 2);
-                    }
-                    const alpha = Math.min(1, t / 120);
-                    ctx.globalAlpha = alpha;
-                    ctx.textAlign = 'center';
-                    ctx.font = '48px "Press Start 2P"';
-                    ctx.fillStyle = '#4a9aff';
-                    ctx.shadowColor = '#4a9aff'; ctx.shadowBlur = 30;
-                    ctx.fillText('MEGA BLASTER X', W / 2, H / 2);
-                    ctx.shadowBlur = 0;
-                    ctx.font = '14px "Press Start 2P"';
-                    ctx.fillStyle = '#ff4488';
-                    ctx.fillText('ULTIMATE EDITION', W / 2, H / 2 + 50);
-                    ctx.globalAlpha = 1;
-                    return;
-                }
-
-                // Phase 2: Action gameplay (180-1200 = 3-20 seconds)
-                if (t >= 180 && t < 1200) {
-                    let sx = 0, sy = 0;
-                    if (this.shake > 0) { sx = (Math.random() - 0.5) * this.shake; sy = (Math.random() - 0.5) * this.shake; }
-                    ctx.save(); ctx.translate(sx, sy);
-
-                    // Background
-                    const grad = ctx.createLinearGradient(0, 0, 0, H);
-                    grad.addColorStop(0, '#1a0a2a'); grad.addColorStop(1, '#0d0518');
-                    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-
-                    // Parallax stars
-                    for (let i = 0; i < 50; i++) {
-                        const px = ((i * 37 - this.openingCamX * 0.1) % W + W) % W;
-                        const py = (i * 23) % (H - 100) + 50;
-                        ctx.fillStyle = `rgba(150,200,255,${0.3 + Math.sin(t * 0.02 + i) * 0.3})`;
-                        ctx.fillRect(px, py, 2, 2);
-                    }
-
-                    // Ground
-                    ctx.fillStyle = '#2a1f3a'; ctx.fillRect(0, 400, W, H - 400);
-                    ctx.fillStyle = '#3a3045'; ctx.fillRect(0, 400, W, 4);
-                    // Grid
-                    ctx.strokeStyle = 'rgba(100,80,150,0.15)';
-                    for (let x = -(this.openingCamX % 40); x < W; x += 40) {
-                        ctx.beginPath(); ctx.moveTo(x, 400); ctx.lineTo(x, H); ctx.stroke();
-                    }
-
-                    // Particles
-                    for (const p of this.openingParticles) {
-                        ctx.fillStyle = p.color; ctx.globalAlpha = p.life / 30;
-                        ctx.fillRect(p.x - this.openingCamX - p.size / 2, p.y - p.size / 2, p.size, p.size);
-                    }
-                    ctx.globalAlpha = 1;
-
-                    // Enemies
-                    for (const e of this.openingEnemies) {
-                        if (e.dead && e.flashTimer <= 0) continue;
-                        const ex = e.x - this.openingCamX;
-                        const flash = e.flashTimer > 0;
-                        ctx.fillStyle = flash ? '#fff' : (e.type === 'gunner' ? '#aa3322' : e.type === 'swordsman' ? '#6622aa' : e.type === 'flier' ? '#6644aa' : '#22aa66');
-                        ctx.fillRect(ex, e.y, e.w, e.h);
-                    }
-
-                    // Player (auto-running)
-                    const p = this.openingPlayer;
-                    const px = p.x - this.openingCamX;
-
-                    // Boost trail
-                    ctx.fillStyle = 'rgba(100,200,255,0.15)';
-                    for (let i = 1; i <= 4; i++) ctx.fillRect(px - p.facing * i * 6, 372, 18, 28);
-
-                    // Body
-                    ctx.fillStyle = '#1a2a5a'; ctx.fillRect(px + 2, 382, 14, 14);
-                    ctx.fillStyle = '#4a9aff'; ctx.fillRect(px + 2, 372, 14, 11);
-                    ctx.fillStyle = '#aaddff'; ctx.fillRect(px + 7, 375, 8, 3);
-                    ctx.fillStyle = '#fff'; ctx.fillRect(px + 9, 376, 2, 2);
-                    ctx.fillStyle = '#15264a'; ctx.fillRect(px + 2, 394, 6, 6); ctx.fillRect(px + 10, 394, 6, 6);
-
-                    // Sword arc
-                    if (p.swordActive > 0) {
-                        ctx.save();
-                        ctx.globalAlpha = p.swordActive / 8;
-                        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 6;
-                        ctx.shadowColor = '#aaddff'; ctx.shadowBlur = 20;
-                        ctx.beginPath();
-                        ctx.arc(px + 18, 386, 35, -Math.PI / 3, Math.PI / 3);
-                        ctx.stroke();
-                        ctx.restore();
-                    }
-
-                    ctx.restore();
-
-                    // Text overlays
-                    for (const txt of OPENING_TEXTS) {
-                        const frame = txt.time * 60;
-                        if (t >= frame && t < frame + 180) {
-                            const progress = (t - frame) / 180;
-                            const alpha = progress < 0.15 ? progress / 0.15 : progress > 0.85 ? (1 - progress) / 0.15 : 1;
-                            ctx.globalAlpha = alpha;
-                            ctx.textAlign = 'center';
-                            ctx.font = '22px "Press Start 2P"';
-                            ctx.fillStyle = '#ffee44';
-                            ctx.shadowColor = '#ff4488'; ctx.shadowBlur = 15;
-                            ctx.fillText(txt.text, W / 2, 150);
-                            ctx.shadowBlur = 0;
-                            ctx.globalAlpha = 1;
-                        }
-                    }
-
-                    // Skip hint
-                    if (t > 120 && Math.floor(t / 30) % 2 === 0) {
-                        ctx.textAlign = 'center';
-                        ctx.font = '8px "Press Start 2P"';
-                        ctx.fillStyle = '#555';
-                        ctx.fillText('PRESS START TO SKIP', W / 2, H - 20);
-                    }
-                    return;
-                }
-
-                // Phase 3: Final logo + PRESS START (1200+ = 20s+)
-                ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-                // Stars
-                for (let i = 0; i < 50; i++) {
-                    const sx = (i * 37 + t * 0.3) % W, sy = (i * 23) % (H - 100) + 50;
-                    ctx.fillStyle = `rgba(150,200,255,${0.3 + Math.sin(t * 0.02 + i) * 0.3})`;
-                    ctx.fillRect(sx, sy, 2, 2);
-                }
-                const fadeAlpha = Math.min(1, (t - 1200) / 60);
-                ctx.globalAlpha = fadeAlpha;
-                ctx.textAlign = 'center';
-                ctx.font = '48px "Press Start 2P"';
-                ctx.fillStyle = '#4a9aff';
-                ctx.shadowColor = '#4a9aff'; ctx.shadowBlur = 30;
-                ctx.fillText('MEGA BLASTER X', W / 2, H / 2 - 20);
-                ctx.shadowBlur = 0;
-                ctx.font = '14px "Press Start 2P"';
-                ctx.fillStyle = '#ff4488';
-                ctx.fillText('ULTIMATE EDITION', W / 2, H / 2 + 20);
-                if (t > 1260 && Math.floor(t / 30) % 2 === 0) {
-                    ctx.font = '12px "Press Start 2P"';
-                    ctx.fillStyle = '#ffee44';
-                    ctx.fillText('PRESS START', W / 2, H / 2 + 80);
-                }
-                ctx.globalAlpha = 1;
-            },
-
             drawSaveSelect() { ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = '#4a6fa5'; ctx.lineWidth = 3; ctx.strokeRect(20, 20, W - 40, H - 40); ctx.fillStyle = '#4a6fa5'; ctx.font = '16px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.fillText('SAVE DATA', W / 2, 55); ctx.strokeStyle = '#334'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(40, 70); ctx.lineTo(W - 40, 70); ctx.stroke(); for (let i = 0; i < 3; i++) { const y = 90 + i * 100; const s = Save.slots[i]; ctx.fillStyle = this.saveCursor === i ? '#2a3a5e' : '#1e1e30'; ctx.fillRect(50, y, W - 100, 80); ctx.strokeStyle = this.saveCursor === i ? '#ffee44' : '#445'; ctx.lineWidth = 2; ctx.strokeRect(50, y, W - 100, 80); if (s) { ctx.fillStyle = '#fff'; ctx.font = '10px "Press Start 2P"'; ctx.textAlign = 'left'; ctx.fillText('SLOT ' + (i + 1), 70, y + 25); ctx.fillStyle = '#aadcff'; ctx.font = '8px "Press Start 2P"'; ctx.fillText('LEVEL: ' + s.hu + '/50', 70, y + 45); ctx.fillText('CLEARED: ' + s.cmp.length, 70, y + 60); ctx.fillText('SCORE: ' + s.sc, 250, y + 45); ctx.fillText('TIME: ' + Math.floor(s.time / 3600) + 'h ' + Math.floor((s.time / 60) % 60) + 'm', 250, y + 60); } else { ctx.fillStyle = '#555'; ctx.font = '10px "Press Start 2P"'; ctx.textAlign = 'left'; ctx.fillText('SLOT ' + (i + 1) + ' - EMPTY', 70, y + 45); ctx.font = '8px "Press Start 2P"'; ctx.fillText('PRESS ENTER TO CREATE', 70, y + 65); } } const ny = 90 + 3 * 100; ctx.fillStyle = this.saveCursor === 3 ? '#2a3a5e' : '#1e1e30'; ctx.fillRect(50, ny, W - 100, 50); ctx.strokeStyle = this.saveCursor === 3 ? '#ffee44' : '#445'; ctx.lineWidth = 2; ctx.strokeRect(50, ny, W - 100, 50); ctx.fillStyle = this.saveCursor === 3 ? '#ffee44' : '#888'; ctx.font = '10px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.fillText('NEW SAVE', W / 2, ny + 30); ctx.fillStyle = '#667'; ctx.font = '8px "Press Start 2P"'; ctx.fillText('UP/DOWN: SELECT | ENTER: CONFIRM', W / 2, H - 35); },
             drawTitle() { const t = this.titleAnim, g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0a0a2a'); g.addColorStop(.5, '#1a0a3a'); g.addColorStop(1, '#0a0518'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.textAlign = 'center'; ctx.font = '40px "Press Start 2P"'; ctx.fillStyle = '#4a9aff'; ctx.fillText('MEGA BLASTER X', W / 2, 140); ctx.font = '12px "Press Start 2P"'; ctx.fillStyle = '#88aaff'; ctx.fillText('ULTIMATE EDITION', W / 2, 190); if (Math.floor(t / 30) % 2 === 0) { ctx.font = '12px "Press Start 2P"'; ctx.fillStyle = '#ffee44'; ctx.fillText('PRESS START', W / 2, 300); } },
             drawMenu() { ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, 0, W, H); ctx.textAlign = 'center'; ctx.font = '30px "Press Start 2P"'; ctx.fillStyle = '#4a9aff'; ctx.fillText('MAIN MENU', W / 2, 80); ctx.font = '10px "Press Start 2P"'; ctx.fillStyle = this.sonicPhysics ? '#44ddff' : '#555'; ctx.fillText('SONIC PHYSICS: ' + (this.sonicPhysics ? 'ON (L3)' : 'OFF (L3)'), W / 2, 110); const items = ['CAMPAIGN MODE', 'CUSTOM LEVELS', 'ONLINE RACE', 'LEVEL EDITOR', 'SAVE SELECT']; ctx.font = '14px "Press Start 2P"'; for (let i = 0; i < items.length; i++) { if (i === this.menuCursor) { ctx.fillStyle = '#ffee44'; ctx.fillText('>', W / 2 - 220, 180 + i * 55); ctx.fillText('<', W / 2 + 220, 180 + i * 55); } ctx.fillStyle = i === this.menuCursor ? '#ffffff' : '#666'; ctx.fillText(items[i], W / 2, 180 + i * 55); } },
@@ -996,7 +737,6 @@
             drawEditor() { ctx.fillStyle = '#111'; ctx.fillRect(0, 50, W, H - 70); ctx.strokeStyle = 'rgba(255,255,255,0.1)'; const offX = this.editorCamX % TILE; for (let x = 0; x <= W; x += TILE) { ctx.beginPath(); ctx.moveTo(x - offX, 50); ctx.lineTo(x - offX, H - 20); ctx.stroke(); } for (let y = 50; y <= H - 20; y += TILE) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); } const th = THEMES[0], sX = Math.floor(this.editorCamX / TILE), eX = Math.ceil((this.editorCamX + W) / TILE); for (let ty = 0; ty < this.editorGrid.length; ty++) { for (let tx = sX; tx < eX; tx++) { if (tx < 0 || tx >= this.editorGrid[0].length) continue; const t = this.editorGrid[ty][tx]; const dx = tx * TILE - this.editorCamX, dy = ty * TILE + 50; if (this.editorImgTiles[ty] && this.editorImgTiles[ty][tx]) { const it = this.editorImgTiles[ty][tx]; if (it.img) { const img = new Image(); img.src = it.img; ctx.drawImage(img, dx, dy, TILE, TILE); } } if (t === 1) { ctx.fillStyle = th.tl; ctx.fillRect(dx, dy, TILE, TILE); } else if (t === 3) { ctx.fillStyle = th.dg; ctx.beginPath(); ctx.moveTo(dx, dy + TILE); ctx.lineTo(dx + TILE / 2, dy); ctx.lineTo(dx + TILE, dy + TILE); ctx.fill(); } else if (t === 4) { ctx.fillStyle = th.ac; ctx.fillRect(dx + 4, dy - 20, TILE - 8, TILE + 20); } if (this.editorImgTiles[ty] && this.editorImgTiles[ty][tx] && this.editorImgTiles[ty][tx].col) { ctx.strokeStyle = 'rgba(0,255,0,0.5)'; ctx.lineWidth = 1; ctx.strokeRect(dx, dy, TILE, TILE); } } } for (const e of this.editorEnemies) { const dx = e.x - this.editorCamX, dy = e.y + 50; ctx.fillStyle = e.type === 'gunner' ? '#aa3322' : e.type === 'swordsman' ? '#6622aa' : e.type === 'flier' ? '#6644aa' : e.type === 'jumper' ? '#22aa66' : '#aa6622'; ctx.fillRect(dx + 2, dy + 8, 20, 14); } if (Input.my > 50 && Input.my < H - 20) { const tx = Math.floor((Input.mx + this.editorCamX) / TILE), ty = Math.floor((Input.my - 50) / TILE); ctx.globalAlpha = 0.5; ctx.fillStyle = this.editorTool === 1 ? th.tl : this.editorTool === 3 ? th.dg : this.editorTool === 4 ? th.ac : '#fff'; ctx.fillRect(tx * TILE - this.editorCamX, ty * TILE + 50, TILE, TILE); ctx.globalAlpha = 1; } if (this.editorSelected) { ctx.strokeStyle = '#ffee44'; ctx.lineWidth = 3; ctx.strokeRect(0, 50, W, H - 70); ctx.fillStyle = '#ffee44'; ctx.font = '8px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.fillText('ALL SELECTED - PRESS BACKSPACE TO CLEAR', W / 2, H - 25); } ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, H - 20, W, 20); ctx.fillStyle = '#fff'; ctx.font = '7px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.fillText('LMB:PLACE RMB:ERASE A/D:PAN CTRL+A:SEL BKSP:CLR ESC:EXIT', W / 2, H - 6); },
             loop() { this.update(); this.render(); requestAnimationFrame(() => this.loop()); }
         };
-
         game.start();
     </script>
 </body>
